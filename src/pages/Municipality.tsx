@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, Clock, Building2, Ambulance, CheckCircle, Map, LayoutGrid, Settings, Siren } from "lucide-react";
 import { Emergency } from "@/types/emergency";
-import { getEmergenciesFromStorage, saveEmergenciesToStorage, generateMockEmergency } from "@/lib/mockData";
+import { API_ENDPOINTS, apiRequest } from "@/lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -29,31 +29,37 @@ import {
 export default function Municipality() {
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [stats, setStats] = useState({ active: 0, resolved: 0, total: 0 });
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
 
   useEffect(() => {
     loadEmergencies();
-    const interval = setInterval(() => {
-      const random = Math.random();
-      if (random > 0.7) {
-        const newEmergency = generateMockEmergency();
-        const current = getEmergenciesFromStorage();
-        const updated = [newEmergency, ...current];
-        saveEmergenciesToStorage(updated);
-        setEmergencies(updated);
-        toast.info("New Emergency Alert", {
-          description: `${newEmergency.type} - ${newEmergency.location}`,
-        });
-      }
-    }, 20000);
-
+    // Poll for new emergencies every 5 seconds
+    const interval = setInterval(loadEmergencies, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const loadEmergencies = () => {
-    const data = getEmergenciesFromStorage();
-    setEmergencies(data);
-    updateStats(data);
+  const loadEmergencies = async () => {
+    try {
+      setLoading(true);
+      const data = await apiRequest<Emergency[]>(API_ENDPOINTS.emergencies);
+      // Sort by ID (newest first - higher timestamp in ID)
+      const sorted = data.sort((a, b) => {
+        // Extract timestamp from ID if it exists (format: E{timestamp})
+        const timestampA = parseInt(a.id.replace('E', '')) || 0;
+        const timestampB = parseInt(b.id.replace('E', '')) || 0;
+        return timestampB - timestampA;
+      });
+      setEmergencies(sorted);
+      updateStats(sorted);
+    } catch (error) {
+      console.error("Failed to load emergencies:", error);
+      toast.error("Failed to load emergencies", {
+        description: "Please check if the backend server is running",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateStats = (data: Emergency[]) => {
@@ -62,14 +68,33 @@ export default function Municipality() {
     setStats({ active, resolved, total: data.length });
   };
 
-  const updateStatus = (id: string, newStatus: Emergency["status"]) => {
-    const updated = emergencies.map(e => e.id === id ? { ...e, status: newStatus } : e);
-    setEmergencies(updated);
-    saveEmergenciesToStorage(updated);
-    updateStats(updated);
-    toast.success("Status Updated", {
-      description: `Emergency ${id} marked as ${newStatus}`,
-    });
+  const updateStatus = async (id: string, newStatus: Emergency["status"]) => {
+    try {
+      const emergency = emergencies.find(e => e.id === id);
+      if (!emergency) return;
+
+      const updatedEmergency = { ...emergency, status: newStatus };
+      
+      // Update in backend
+      await apiRequest(`${API_ENDPOINTS.emergencies}/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      // Update local state
+      const updated = emergencies.map(e => e.id === id ? updatedEmergency : e);
+      setEmergencies(updated);
+      updateStats(updated);
+
+      toast.success("Status Updated", {
+        description: `Emergency ${id} marked as ${newStatus}`,
+      });
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      toast.error("Failed to update status", {
+        description: "Please try again later",
+      });
+    }
   };
 
   const getStatusColor = (status: Emergency["status"]) => {
@@ -203,7 +228,13 @@ export default function Municipality() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {emergencies.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        Loading emergencies...
+                      </TableCell>
+                    </TableRow>
+                  ) : emergencies.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         No emergency alerts yet. System is monitoring...
@@ -226,35 +257,18 @@ export default function Municipality() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {emergency.status === "Pending" && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => updateStatus(emergency.id, "Forwarded")}
-                                >
-                                  <Building2 className="h-3 w-3 mr-1" />
-                                  Forward
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => updateStatus(emergency.id, "Ambulance Assigned")}
-                                >
-                                  <Ambulance className="h-3 w-3 mr-1" />
-                                  Assign
-                                </Button>
-                              </>
-                            )}
-                            {!["Resolved", "Complete"].includes(emergency.status) && emergency.status !== "Pending" && (
+                            {!["Resolved", "Complete", "Treated"].includes(emergency.status) && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => updateStatus(emergency.id, "Resolved")}
                               >
                                 <CheckCircle className="h-3 w-3 mr-1" />
-                                Resolve
+                                Mark as Resolved
                               </Button>
+                            )}
+                            {["Resolved", "Complete", "Treated"].includes(emergency.status) && (
+                              <span className="text-xs text-muted-foreground">Resolved</span>
                             )}
                           </div>
                         </TableCell>

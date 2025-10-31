@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -7,6 +7,8 @@ import "leaflet/dist/leaflet.css";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarTrigger } from "@/components/ui/sidebar";
 import { Link, useLocation } from "react-router-dom";
 import { LayoutGrid, Map, Building2, Settings, Siren } from "lucide-react";
+import { Emergency } from "@/types/emergency";
+import { API_ENDPOINTS, apiRequest } from "@/lib/api";
 
 // Fix for Leaflet default icon issue in React
 import L from "leaflet";
@@ -27,6 +29,19 @@ const BlueIcon = new Icon({
   iconUrl: "data:image/svg+xml;base64," + btoa(`
     <svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
       <path fill="#3b82f6" d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.5 12.5 28.5 12.5 28.5S25 21 25 12.5C25 5.6 19.4 0 12.5 0z"/>
+      <circle fill="white" cx="12.5" cy="12.5" r="5"/>
+    </svg>
+  `),
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
+// Red marker icon for emergency alerts
+const RedIcon = new Icon({
+  iconUrl: "data:image/svg+xml;base64," + btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
+      <path fill="#ef4444" d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.5 12.5 28.5 12.5 28.5S25 21 25 12.5C25 5.6 19.4 0 12.5 0z"/>
       <circle fill="white" cx="12.5" cy="12.5" r="5"/>
     </svg>
   `),
@@ -106,13 +121,39 @@ const staticMarkers = [
   },
 ];
 
+// The IoT device that triggers SOS alerts (always the first one)
+const SOS_TRIGGER_DEVICE_ID = "iot-001";
+
 export default function MunicipalityMap() {
   const location = useLocation();
+  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
 
   // Set default icon for Leaflet
   useEffect(() => {
     L.Marker.prototype.options.icon = DefaultIcon;
   }, []);
+
+  // Fetch emergencies and check if any are pending
+  useEffect(() => {
+    const loadEmergencies = async () => {
+      try {
+        const data = await apiRequest<Emergency[]>(API_ENDPOINTS.emergencies);
+        setEmergencies(data);
+      } catch (error) {
+        console.error("Failed to load emergencies:", error);
+      }
+    };
+
+    loadEmergencies();
+    // Poll every 3 seconds
+    const interval = setInterval(loadEmergencies, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check if there are active/pending emergencies
+  const hasActiveEmergency = useMemo(() => {
+    return emergencies.some(e => !["Resolved", "Complete", "Treated"].includes(e.status));
+  }, [emergencies]);
 
   return (
     <SidebarProvider>
@@ -180,6 +221,10 @@ export default function MunicipalityMap() {
                     <div className="w-4 h-4 rounded-full bg-blue-500"></div>
                     <span>IoT Emergency Detection Devices</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-red-500 animate-pulse"></div>
+                    <span>Active SOS Alert (IOT-001)</span>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -196,26 +241,43 @@ export default function MunicipalityMap() {
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       maxZoom={19}
                     />
-                    {staticMarkers.map((marker) => (
-                      <Marker
-                        key={marker.id}
-                        position={marker.position}
-                        icon={BlueIcon}
-                      >
-                        <Popup>
-                          <div className="space-y-2 min-w-[200px]">
-                            <div className="font-bold text-base">{marker.name}</div>
-                            <div className="text-sm font-medium text-muted-foreground">{marker.type}</div>
-                            <div className="text-xs text-muted-foreground">{marker.description}</div>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">
-                                {marker.status}
-                              </span>
+                    {staticMarkers.map((marker) => {
+                      // IOT-001 turns red when there's an active emergency
+                      const isSOSTrigger = marker.id === SOS_TRIGGER_DEVICE_ID;
+                      const hasActiveAlert = isSOSTrigger && hasActiveEmergency;
+                      // Show red icon when active, blue when resolved
+                      const iconToUse = hasActiveAlert ? RedIcon : BlueIcon;
+                      
+                      return (
+                        <Marker
+                          key={marker.id}
+                          position={marker.position}
+                          icon={iconToUse}
+                        >
+                          <Popup>
+                            <div className="space-y-2 min-w-[200px]">
+                              <div className="font-bold text-base">{marker.name}</div>
+                              <div className="text-sm font-medium text-muted-foreground">{marker.type}</div>
+                              <div className="text-xs text-muted-foreground">{marker.description}</div>
+                              {hasActiveAlert && (
+                                <div className="text-xs text-red-600 font-semibold mt-1">
+                                  🚨 SOS Alert Active
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className={`text-xs px-2 py-1 rounded ${
+                                  hasActiveAlert
+                                    ? "bg-red-100 text-red-700" 
+                                    : "bg-blue-100 text-blue-700"
+                                }`}>
+                                  {hasActiveAlert ? "Alert Triggered" : marker.status}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
                   </MapContainer>
                 </div>
               </CardContent>

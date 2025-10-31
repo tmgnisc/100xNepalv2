@@ -1,125 +1,19 @@
 {
   "emergencies": [
     {
-      "id": "E1734123456789",
-      "name": "Ramesh Thapa",
+      "id": "E1761933558512",
+      "name": "test",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "234234234",
       "type": "Accident",
-      "location": "Khalanga Bazaar",
-      "wardNo": "Ward 5",
-      "phone": "9841234567",
-      "time": "10:30 AM",
-      "status": "Pending",
-      "lat": 29.27,
-      "lng": 82.19
-    },
-    {
-      "id": "E1734123456790",
-      "name": "Sita Karki",
-      "type": "Pregnancy",
-      "location": "Patarasi Village",
-      "wardNo": "Ward 3",
-      "phone": "9852345678",
-      "time": "11:15 AM",
-      "status": "Forwarded",
-      "hospitalId": "h1",
-      "lat": 29.25,
-      "lng": 82.20
-    },
-    {
-      "id": "E1734123456791",
-      "name": "Krishna Sharma",
-      "type": "Illness",
-      "location": "Chhumchaur",
-      "wardNo": "Ward 7",
-      "phone": "9863456789",
-      "time": "09:45 AM",
-      "status": "Ambulance Dispatched",
-      "hospitalId": "h1",
-      "ambulanceId": "a1",
-      "lat": 29.28,
-      "lng": 82.18
+      "time": "11:44 PM",
+      "status": "Resolved",
+      "lat": 27.648483967596327,
+      "lng": 85.45216561957557
     }
   ],
-  "hospitals": [
-    {
-      "id": "h1",
-      "name": "Karnali Provincial Hospital",
-      "beds": 15,
-      "doctors": 8,
-      "ambulances": 3,
-      "readiness": "high"
-    },
-    {
-      "id": "h2",
-      "name": "Jumla District Hospital",
-      "beds": 8,
-      "doctors": 5,
-      "ambulances": 2,
-      "readiness": "medium"
-    },
-    {
-      "id": "h3",
-      "name": "Mugu Health Post",
-      "beds": 4,
-      "doctors": 2,
-      "ambulances": 1,
-      "readiness": "low"
-    }
-  ],
-  "volunteers": [
-    {
-      "id": "v1",
-      "name": "Ram Bahadur",
-      "phone": "9801234567",
-      "ambulanceId": "a1",
-      "status": "available",
-      "location": {
-        "lat": 29.27,
-        "lng": 82.19
-      }
-    },
-    {
-      "id": "v2",
-      "name": "Sita Devi",
-      "phone": "9812345678",
-      "ambulanceId": "a2",
-      "status": "on-mission",
-      "location": {
-        "lat": 29.25,
-        "lng": 82.20
-      }
-    }
-  ],
-  "ambulances": [
-    {
-      "id": "a1",
-      "hospitalId": "h1",
-      "volunteerId": "v1",
-      "status": "available",
-      "location": {
-        "lat": 29.27,
-        "lng": 82.19
-      }
-    },
-    {
-      "id": "a2",
-      "hospitalId": "h1",
-      "volunteerId": "v2",
-      "status": "on-route",
-      "location": {
-        "lat": 29.25,
-        "lng": 82.20
-      }
-    },
-    {
-      "id": "a3",
-      "hospitalId": "h2",
-      "status": "available",
-      "location": {
-        "lat": 29.30,
-        "lng": 82.22
-      }
-    }
-  ]
+  "hospitals": [],
+  "volunteers": [],
+  "ambulances": []
 }
-

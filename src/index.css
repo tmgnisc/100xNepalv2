@@ -141,4 +141,20 @@ All colors MUST be HSL.
       box-shadow: 0 0 0 10px hsl(var(--emergency) / 0);
     }
   }
+
+  /* Fast blinking animation for SOS markers */
+  .blinking-marker {
+    animation: fast-blink 0.3s infinite;
+  }
+
+  @keyframes fast-blink {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.1);
+    }
+  }
 }

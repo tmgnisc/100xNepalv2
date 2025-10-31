@@ -47,9 +47,11 @@ export default function RuralPanel() {
             method: "POST",
             body: JSON.stringify(newEmergency),
           });
+          toast.success("Synced to server", { description: "Emergency saved to backend" });
         } catch (error) {
           // Non-blocking: show error but keep local success
-          console.error("Failed to sync with backend:", error);
+          console.error("Failed to sync with backend:")
+          console.error(error);
           toast.error("Saved locally. Sync to server failed.");
         }
       })();
