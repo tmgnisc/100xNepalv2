@@ -1,0 +1,18 @@
+{
+  "port": 3001,
+  "host": "localhost",
+  "watch": true,
+  "routes": "routes.json",
+  "middlewares": [],
+  "static": "./public",
+  "readOnly": false,
+  "noCors": false,
+  "noGzip": false,
+  "quiet": false,
+  "log": true,
+  "delay": 0,
+  "id": "id",
+  "foreignKeySuffix": "Id",
+  "rewriteRules": []
+}
+

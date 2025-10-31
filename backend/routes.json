@@ -1,0 +1,11 @@
+{
+  "/api/emergencies": "/emergencies",
+  "/api/emergencies/:id": "/emergencies/:id",
+  "/api/hospitals": "/hospitals",
+  "/api/hospitals/:id": "/hospitals/:id",
+  "/api/volunteers": "/volunteers",
+  "/api/volunteers/:id": "/volunteers/:id",
+  "/api/ambulances": "/ambulances",
+  "/api/ambulances/:id": "/ambulances/:id"
+}
+

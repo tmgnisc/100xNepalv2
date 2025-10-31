@@ -1,17 +1,35 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Clock, Building2, Ambulance, CheckCircle } from "lucide-react";
+import { AlertTriangle, Clock, Building2, Ambulance, CheckCircle, Map, LayoutGrid, Settings, Siren } from "lucide-react";
 import { Emergency } from "@/types/emergency";
 import { getEmergenciesFromStorage, saveEmergenciesToStorage, generateMockEmergency } from "@/lib/mockData";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
 export default function Municipality() {
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [stats, setStats] = useState({ active: 0, resolved: 0, total: 0 });
+  const location = useLocation();
 
   useEffect(() => {
     loadEmergencies();
@@ -61,8 +79,58 @@ export default function Municipality() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8">
-      <motion.div
+    <SidebarProvider>
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="px-3 py-2">
+          <div className="flex items-center gap-2 px-1 py-1.5 text-sm font-semibold">
+            <Siren className="h-4 w-4 text-emergency" />
+            Municipality
+          </div>
+          <SidebarTrigger className="ml-auto" />
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location.pathname === "/municipality"}>
+                    <Link to="/municipality">
+                      <LayoutGrid />
+                      <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/municipality/map") }>
+                    <Link to="/municipality/map">
+                      <Map />
+                      <span>Map</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled>
+                    <Building2 />
+                    <span>Hospitals</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled>
+                    <Settings />
+                    <span>Settings</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter />
+        <SidebarRail />
+      </Sidebar>
+      <SidebarInset>
+        <div className="min-h-[calc(100vh-4rem)] p-4 md:p-8">
+          <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -198,7 +266,9 @@ export default function Municipality() {
             </div>
           </CardContent>
         </Card>
-      </motion.div>
-    </div>
+          </motion.div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
