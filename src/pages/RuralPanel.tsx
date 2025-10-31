@@ -8,6 +8,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmergencyType } from "@/types/emergency";
 import { getEmergenciesFromStorage, saveEmergenciesToStorage } from "@/lib/mockData";
+import { API_ENDPOINTS, apiRequest } from "@/lib/api";
 import { motion } from "framer-motion";
 
 export default function RuralPanel() {
@@ -39,10 +40,24 @@ export default function RuralPanel() {
       const existingEmergencies = getEmergenciesFromStorage();
       saveEmergenciesToStorage([newEmergency, ...existingEmergencies]);
 
+      // Also persist to backend (json-server)
+      (async () => {
+        try {
+          await apiRequest(API_ENDPOINTS.emergencies, {
+            method: "POST",
+            body: JSON.stringify(newEmergency),
+          });
+        } catch (error) {
+          // Non-blocking: show error but keep local success
+          console.error("Failed to sync with backend:", error);
+          toast.error("Saved locally. Sync to server failed.");
+        }
+      })();
+
       setIsSubmitting(false);
       setShowSuccess(true);
       toast.success("Emergency Alert Sent!", {
-        description: "Help is on the way. Stay calm and stay safe.",
+        description: "Help is on the way. Your alert has been submitted.",
       });
 
       setTimeout(() => {
