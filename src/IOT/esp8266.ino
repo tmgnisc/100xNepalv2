@@ -11,7 +11,12 @@ ESP8266WebServer server(80);
 WiFiClient client; // Required for HTTPClient in new ESP8266 core
 
 // ===== LED Configuration =====
-#define LED_PIN 2  // Built-in LED on most ESP8266 boards (GPIO2, D4)
+// Try these pins if LED doesn't work:
+//   GPIO2 (D4) - Most common, INVERTED (LOW = ON, HIGH = OFF) - ESP8266-01, NodeMCU
+//   GPIO16 (D0) - Some boards use this, NOT inverted (HIGH = ON, LOW = OFF)
+//   GPIO0 (D3) - Some boards use this
+// If your board LED is NOT inverted, change logic: HIGH = ON, LOW = OFF
+#define LED_PIN 2  // Built-in LED pin - adjust if needed
 // Note: GPIO2 LED is INVERTED on most ESP8266 boards (LOW = ON, HIGH = OFF)
 bool ledBlinking = false;
 unsigned long blinkStartTime = 0;

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { EmergencyType } from "@/types/emergency";
 import { getEmergenciesFromStorage, saveEmergenciesToStorage } from "@/lib/mockData";
 import { API_ENDPOINTS, apiRequest, getESP8266Url } from "@/lib/api";
+import { broadcastSOSAlert } from "@/lib/mobileBridge";
 import { motion } from "framer-motion";
 
 export default function RuralPanel() {
@@ -134,6 +135,17 @@ export default function RuralPanel() {
             // Silent failure - ESP8266 might be offline, don't block SOS submission
             console.warn("ESP8266 device unavailable:", error);
           }
+        }
+      })();
+
+      // Broadcast SOS alert via Bluetooth to nearby devices
+      (async () => {
+        try {
+          await broadcastSOSAlert(newEmergency);
+          console.log("📡 SOS alert broadcasted to nearby devices");
+        } catch (error) {
+          // Silent failure - Bluetooth might not be available
+          console.warn("Bluetooth broadcast failed (might not be supported):", error);
         }
       })();
 

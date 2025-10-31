@@ -71,6 +71,66 @@
       "status": "Resolved",
       "lat": 27.645618249481803,
       "lng": 85.44725359523774
+    },
+    {
+      "id": "E1761940912891",
+      "name": "Gv",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "88",
+      "type": "Illness",
+      "time": "01:46 AM",
+      "status": "Resolved",
+      "lat": 27.65156465419033,
+      "lng": 85.45385176639215
+    },
+    {
+      "id": "E1761941656199",
+      "name": "Tt",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "66",
+      "type": "Illness",
+      "time": "01:59 AM",
+      "status": "Resolved",
+      "lat": 27.652561952645357,
+      "lng": 85.44711128927206
+    },
+    {
+      "id": "E1761942376143",
+      "name": "Fcc",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "668",
+      "type": "Illness",
+      "time": "02:11 AM",
+      "status": "Resolved",
+      "lat": 27.64666510899421,
+      "lng": 85.45332980964852
+    },
+    {
+      "id": "E1761942720367",
+      "name": "Hsbs",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "3464",
+      "type": "Illness",
+      "time": "02:17 AM",
+      "status": "Resolved",
+      "lat": 27.647418900940956,
+      "lng": 85.44585059444914
+    },
+    {
+      "id": "E1761942754346",
+      "name": "Eye",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "3434",
+      "type": "Illness",
+      "time": "02:17 AM",
+      "status": "Resolved",
+      "lat": 27.6545644543923,
+      "lng": 85.45355029968539
     }
   ],
   "hospitals": [],
