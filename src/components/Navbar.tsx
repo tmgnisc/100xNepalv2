@@ -1,13 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Home, Users, Building2, Ambulance, Info } from "lucide-react";
+import { Activity, Home, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
   { to: "/", label: "Home", icon: Home },
   { to: "/rural", label: "Rural SOS", icon: Activity },
-  { to: "/municipality", label: "Municipality", icon: Users },
-  { to: "/hospital", label: "Hospital", icon: Building2 },
-  { to: "/volunteer", label: "Volunteer", icon: Ambulance },
   { to: "/about", label: "About", icon: Info },
 ];
 
@@ -44,7 +41,7 @@ export default function Navbar() {
           </div>
 
           <div className="md:hidden flex items-center gap-2">
-            {navLinks.slice(1, 5).map(({ to, icon: Icon }) => (
+            {navLinks.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
@@ -54,6 +51,7 @@ export default function Navbar() {
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted"
                 )}
+                aria-label={label}
               >
                 <Icon className="h-5 w-5" />
               </Link>
