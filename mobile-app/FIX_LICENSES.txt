@@ -1,0 +1,20 @@
+═══════════════════════════════════════════════════════════════
+  QUICK FIX: Accept Android SDK Licenses
+═══════════════════════════════════════════════════════════════
+
+Run this command in your terminal:
+
+    cd mobile-app
+    ./accept-licenses.sh
+
+Or manually run:
+
+    sudo bash -c 'mkdir -p /usr/lib/android-sdk/licenses && echo -e "24333f8a63b6825ea9c5514f83c2829b004d1fee\n601085b94cd77f0b54ff86406957099ebe79c4d6" > /usr/lib/android-sdk/licenses/android-sdk-license && echo -e "84831b9409646a918e30573bab4c9c91346d8abd" > /usr/lib/android-sdk/licenses/android-sdk-preview-license'
+
+After accepting licenses, build the APK:
+
+    cd android
+    ./gradlew assembleRelease
+
+═══════════════════════════════════════════════════════════════
+
