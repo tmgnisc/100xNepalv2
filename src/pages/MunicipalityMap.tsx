@@ -38,71 +38,71 @@ const BlueIcon = new Icon({
 // Tamaghat area, Kavrepalanchowk coordinates (hilly region)
 const TAMAGHAT_CENTER: [number, number] = [27.6500, 85.4500];
 
-// Static markers within Tamaghat area - all blue markers
+// IoT Device markers within Tamaghat area - all blue markers
 const staticMarkers = [
   {
-    id: "m1",
+    id: "iot-001",
     position: [27.6510, 85.4515] as [number, number],
-    name: "Tamaghat Health Center",
-    type: "Healthcare Center",
-    status: "Active",
-    description: "Primary healthcare facility serving Tamaghat area",
+    name: "IoT Device IOT-001",
+    type: "Emergency Detection Sensor",
+    status: "Online",
+    description: "IoT sensor monitoring emergency alerts in Tamaghat area",
   },
   {
-    id: "m2",
+    id: "iot-002",
     position: [27.6480, 85.4480] as [number, number],
-    name: "Tamaghat Emergency Response Unit",
-    type: "Emergency Service",
-    status: "On Standby",
-    description: "24/7 emergency response team for Tamaghat",
+    name: "IoT Device IOT-002",
+    type: "SOS Alert Node",
+    status: "Online",
+    description: "IoT device for receiving and transmitting emergency SOS signals",
   },
   {
-    id: "m3",
+    id: "iot-003",
     position: [27.6525, 85.4530] as [number, number],
-    name: "Tamaghat Health Post",
-    type: "Health Post",
-    status: "Active",
-    description: "Community health post in Tamaghat central area",
+    name: "IoT Device IOT-003",
+    type: "Monitoring Station",
+    status: "Online",
+    description: "IoT monitoring station tracking emergency events in real-time",
   },
   {
-    id: "m4",
+    id: "iot-004",
     position: [27.6460, 85.4520] as [number, number],
-    name: "Tamaghat Ward Clinic",
-    type: "Ward Clinic",
-    status: "Active",
-    description: "Ward-level healthcare facility in Tamaghat",
+    name: "IoT Device IOT-004",
+    type: "Emergency Sensor Node",
+    status: "Online",
+    description: "IoT sensor node detecting and reporting emergency incidents",
   },
   {
-    id: "m5",
+    id: "iot-005",
     position: [27.6495, 85.4465] as [number, number],
-    name: "Tamaghat Emergency Service",
-    type: "Emergency Service",
-    status: "Active",
-    description: "Emergency coordination center for Tamaghat area",
+    name: "IoT Device IOT-005",
+    type: "Alert Transmission Unit",
+    status: "Online",
+    description: "IoT device for emergency alert transmission and coordination",
   },
   {
-    id: "m6",
+    id: "iot-006",
     position: [27.6530, 85.4495] as [number, number],
-    name: "Tamaghat Health Outpost",
-    type: "Health Outpost",
-    status: "Active",
-    description: "Health monitoring outpost in Tamaghat region",
+    name: "IoT Device IOT-006",
+    type: "Emergency Monitoring Device",
+    status: "Online",
+    description: "IoT monitoring device tracking emergency situations in region",
   },
   {
-    id: "m7",
+    id: "iot-007",
     position: [27.6475, 85.4540] as [number, number],
-    name: "Tamaghat Community Health Center",
-    type: "Community Health Center",
-    status: "Active",
-    description: "Serving Tamaghat community healthcare needs",
+    name: "IoT Device IOT-007",
+    type: "Sensor Node",
+    status: "Online",
+    description: "IoT sensor node for continuous emergency detection and reporting",
   },
   {
-    id: "m8",
+    id: "iot-008",
     position: [27.6505, 85.4475] as [number, number],
-    name: "Tamaghat Ambulance Station",
-    type: "Ambulance Service",
-    status: "Active",
-    description: "Ambulance service point for Tamaghat area",
+    name: "IoT Device IOT-008",
+    type: "Emergency Detection Device",
+    status: "Online",
+    description: "IoT device for detecting and reporting emergency incidents",
   },
 ];
 
@@ -169,16 +169,16 @@ export default function MunicipalityMap() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <div className="mb-4">
               <h1 className="text-3xl md:text-4xl font-bold mb-2">Tamaghat Area Map</h1>
-              <p className="text-muted-foreground">Kavrepalanchowk District - Healthcare & Emergency Services</p>
+              <p className="text-muted-foreground">Kavrepalanchowk District - IoT Device Locations</p>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Tamaghat Area Map</CardTitle>
+                <CardTitle>IoT Device Network Map</CardTitle>
                 <div className="flex gap-4 mt-2 text-sm">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                    <span>Healthcare & Emergency Services</span>
+                    <span>IoT Emergency Detection Devices</span>
                   </div>
                 </div>
               </CardHeader>

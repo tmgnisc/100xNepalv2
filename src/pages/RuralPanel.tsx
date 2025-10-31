@@ -15,8 +15,8 @@ export default function RuralPanel() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    wardNo: "",
-    location: "",
+    wardNo: "Ward 16",
+    location: "Tamaghat",
     phone: "",
     type: "Accident" as EmergencyType,
   });
@@ -31,8 +31,9 @@ export default function RuralPanel() {
         ...formData,
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         status: "Pending" as const,
-        lat: 29.27 + (Math.random() - 0.5) * 0.3,
-        lng: 82.19 + (Math.random() - 0.5) * 0.3,
+        // Tamaghat area coordinates (same as municipality map)
+        lat: 27.6500 + (Math.random() - 0.5) * 0.01,
+        lng: 85.4500 + (Math.random() - 0.5) * 0.01,
       };
 
       const existingEmergencies = getEmergenciesFromStorage();
@@ -48,8 +49,8 @@ export default function RuralPanel() {
         setShowSuccess(false);
         setFormData({
           name: "",
-          wardNo: "",
-          location: "",
+          wardNo: "Ward 16",
+          location: "Tamaghat",
           phone: "",
           type: "Accident",
         });
@@ -138,11 +139,12 @@ export default function RuralPanel() {
                   <Label htmlFor="wardNo" className="text-base">Ward Number *</Label>
                   <Input
                     id="wardNo"
-                    placeholder="e.g., Ward 5"
+                    placeholder="Ward 16"
                     value={formData.wardNo}
                     onChange={(e) => setFormData({ ...formData, wardNo: e.target.value })}
                     required
                     className="h-14 text-lg"
+                    readOnly
                   />
                 </div>
 
@@ -163,11 +165,12 @@ export default function RuralPanel() {
                 <Label htmlFor="location" className="text-base">Location Details *</Label>
                 <Input
                   id="location"
-                  placeholder="Village/Area name"
+                  placeholder="Tamaghat"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   required
                   className="h-14 text-lg"
+                  readOnly
                 />
               </div>
 
