@@ -1,6 +1,6 @@
 {
   "port": 3001,
-  "host": "localhost",
+  "host": "0.0.0.0",
   "watch": true,
   "routes": "routes.json",
   "middlewares": [],

@@ -9,8 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "json-server --watch backend/db.json --port 3001 --routes backend/routes.json",
-    "server:prod": "json-server backend/db.json --port 3001 --routes backend/routes.json",
+    "server": "json-server --watch backend/db.json --port 3001 --host 0.0.0.0 --routes backend/routes.json",
+    "server:prod": "json-server backend/db.json --port 3001 --host 0.0.0.0 --routes backend/routes.json",
     "dev:full": "concurrently \"npm run dev\" \"npm run server\""
   },
   "dependencies": {

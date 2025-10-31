@@ -43,16 +43,72 @@ export default function RuralPanel() {
       // Also persist to backend (json-server)
       (async () => {
         try {
-          await apiRequest(API_ENDPOINTS.emergencies, {
+          console.log("Sending emergency to backend:", newEmergency);
+          
+          // Use direct fetch with proper headers to avoid caching issues
+          const response = await fetch(API_ENDPOINTS.emergencies, {
             method: "POST",
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            cache: 'no-store',
             body: JSON.stringify(newEmergency),
           });
-          toast.success("Synced to server", { description: "Emergency saved to backend" });
+          
+          console.log("Backend response:", {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries()),
+          });
+
+          // JSON Server returns 201 for successful POST
+          if (response.status === 201) {
+            const data = await response.json().catch(() => null);
+            console.log("Emergency saved to backend:", data);
+            toast.success("Synced to server", { description: "Emergency saved to backend" });
+          } else if (response.status === 200) {
+            // Some servers return 200 instead of 201
+            const data = await response.json().catch(() => null);
+            console.log("Emergency saved to backend (200):", data);
+            toast.success("Synced to server", { description: "Emergency saved to backend" });
+          } else if (response.status === 304) {
+            // 304 for POST is unusual - check if data exists, if not retry
+            console.warn("Received 304 for POST request");
+            const checkResponse = await fetch(API_ENDPOINTS.emergencies);
+            const existing = await checkResponse.json().catch(() => []);
+            const wasSaved = Array.isArray(existing) && existing.some((e: any) => e.id === newEmergency.id);
+            
+            if (!wasSaved) {
+              // Retry with a completely fresh request
+              console.log("Retrying POST request...");
+              const retryResponse = await fetch(API_ENDPOINTS.emergencies, {
+                method: "POST",
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ...newEmergency, _timestamp: Date.now() }),
+              });
+              
+              if (retryResponse.ok) {
+                toast.success("Synced to server", { description: "Emergency saved to backend" });
+              } else {
+                throw new Error(`Retry failed: ${retryResponse.status}`);
+              }
+            } else {
+              toast.success("Synced to server", { description: "Emergency already saved" });
+            }
+          } else {
+            const errorText = await response.text().catch(() => response.statusText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
         } catch (error) {
           // Non-blocking: show error but keep local success
-          console.error("Failed to sync with backend:")
-          console.error(error);
-          toast.error("Saved locally. Sync to server failed.");
+          console.error("Failed to sync with backend:", error);
+          toast.error("Saved locally. Sync to server failed.", {
+            description: error instanceof Error ? error.message : "Please check backend server",
+          });
         }
       })();
 

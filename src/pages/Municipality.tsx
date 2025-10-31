@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Clock, Building2, Ambulance, CheckCircle, Map, LayoutGrid, Settings, Siren } from "lucide-react";
+import { AlertTriangle, Clock, Building2, Ambulance, CheckCircle, Map, LayoutGrid, Settings, Siren, Users } from "lucide-react";
 import { Emergency } from "@/types/emergency";
 import { API_ENDPOINTS, apiRequest } from "@/lib/api";
 import { toast } from "sonner";
@@ -135,9 +135,11 @@ export default function Municipality() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton disabled>
-                    <Building2 />
-                    <span>Hospitals</span>
+                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/municipality/volunteers")}>
+                    <Link to="/municipality/volunteers">
+                      <Users />
+                      <span>Volunteers</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

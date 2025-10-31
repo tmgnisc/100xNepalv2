@@ -2,9 +2,35 @@
  * API Configuration and Base URL
  * 
  * This file contains the API configuration for connecting to the JSON Server backend.
+ * Automatically detects hostname to work with mobile devices accessing via IP address.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Detect the current hostname (works for localhost and IP addresses)
+const getApiBaseUrl = () => {
+  // Use environment variable if set
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // Detect hostname from current window location
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    // Use the same hostname but port 3001 for API
+    return `${protocol}//${hostname}:3001/api`;
+  }
+  
+  // Fallback to localhost
+  return 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log API URL for debugging (especially helpful for mobile access)
+if (typeof window !== 'undefined') {
+  console.log('API Base URL:', API_BASE_URL);
+  console.log('Current hostname:', window.location.hostname);
+}
 
 export const API_ENDPOINTS = {
   emergencies: `${API_BASE_URL}/emergencies`,
@@ -36,14 +62,43 @@ export async function apiRequest<T>(
   try {
     const response = await fetch(url, {
       ...options,
+      cache: 'no-cache', // Prevent caching
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
         ...options?.headers,
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    // Log response for debugging
+    console.log('API Response:', {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      method: options?.method || 'GET',
+    });
+
+    if (!response.ok && response.status !== 304) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`API Error: ${response.status} ${errorText}`);
+    }
+
+    // Handle 304 Not Modified - return empty or cached data
+    if (response.status === 304) {
+      console.warn('Received 304 Not Modified. This might indicate a caching issue.');
+      return {} as T;
+    }
+
+    // For POST/PUT/PATCH, return the created/updated object
+    if (response.status === 201 || response.status === 200) {
+      try {
+        return await response.json();
+      } catch (e) {
+        // If response has no body (some POST requests), return the request data
+        return {} as T;
+      }
     }
 
     return await response.json();

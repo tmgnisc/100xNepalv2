@@ -6,7 +6,7 @@ import { Icon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarTrigger } from "@/components/ui/sidebar";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutGrid, Map, Building2, Settings, Siren } from "lucide-react";
+import { LayoutGrid, Map, Users, Settings, Siren } from "lucide-react";
 import { Emergency } from "@/types/emergency";
 import { API_ENDPOINTS, apiRequest } from "@/lib/api";
 
@@ -179,7 +179,7 @@ export default function MunicipalityMap() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/municipality/map") }>
+                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/municipality/map")}>
                     <Link to="/municipality/map">
                       <Map />
                       <span>Map</span>
@@ -187,9 +187,11 @@ export default function MunicipalityMap() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton disabled>
-                    <Building2 />
-                    <span>Hospitals</span>
+                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/municipality/volunteers")}>
+                    <Link to="/municipality/volunteers">
+                      <Users />
+                      <span>Volunteers</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
