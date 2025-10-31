@@ -7,6 +7,7 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import RuralPanel from "./pages/RuralPanel";
 import Municipality from "./pages/Municipality";
+import MunicipalityMap from "./pages/MunicipalityMap";
 import Hospital from "./pages/Hospital";
 import Volunteer from "./pages/Volunteer";
 import About from "./pages/About";
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/" element={<Home />} />
           <Route path="/rural" element={<RuralPanel />} />
           <Route path="/municipality" element={<Municipality />} />
+          <Route path="/municipality/map" element={<MunicipalityMap />} />
           <Route path="/hospital" element={<Hospital />} />
           <Route path="/volunteer" element={<Volunteer />} />
           <Route path="/about" element={<About />} />
