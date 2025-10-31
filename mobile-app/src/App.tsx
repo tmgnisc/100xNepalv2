@@ -23,17 +23,33 @@ const App = () => {
 
   const initializeApp = async () => {
     try {
+      // Load stored alerts first (doesn't require Bluetooth)
+      await BluetoothService.loadStoredAlerts();
+      setAlerts(BluetoothService.getReceivedAlerts());
+      
+      // Try to initialize Bluetooth (non-blocking)
       const initialized = await BluetoothService.initialize();
       if (initialized) {
-        await BluetoothService.loadStoredAlerts();
-        setAlerts(BluetoothService.getReceivedAlerts());
         setIsReady(true);
+        console.log('✅ App initialized successfully');
       } else {
-        Alert.alert('Error', 'Failed to initialize Bluetooth');
+        console.warn('⚠️ Bluetooth initialization failed, but app can still run');
+        setIsReady(true); // Still mark as ready - user can enable Bluetooth later
+        Alert.alert(
+          'Bluetooth Required',
+          'Please enable Bluetooth and grant permissions to receive SOS alerts.',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('Initialization error:', error);
-      Alert.alert('Error', 'Failed to initialize app');
+      // Don't crash - show warning but allow app to continue
+      setIsReady(true);
+      Alert.alert(
+        'Warning',
+        'Some features may not work. Please check Bluetooth permissions in Settings.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -44,23 +60,42 @@ const App = () => {
       
       // Check for alerts periodically
       const interval = setInterval(async () => {
-        await BluetoothService.checkForSharedAlerts();
-        const updatedAlerts = BluetoothService.getReceivedAlerts();
-        setAlerts([...updatedAlerts]);
+        try {
+          await BluetoothService.checkForSharedAlerts();
+          const updatedAlerts = BluetoothService.getReceivedAlerts();
+          setAlerts([...updatedAlerts]);
+        } catch (error) {
+          console.error('Error checking alerts:', error);
+        }
       }, 5000); // Check every 5 seconds
 
-      // Store interval for cleanup (you'd handle this properly)
+      // Store interval for cleanup
+      (global as any).__scanInterval = interval;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Scan error:', error);
-      Alert.alert('Error', 'Failed to start scanning');
       setIsScanning(false);
+      Alert.alert(
+        'Scan Failed',
+        error?.message || 'Failed to start scanning. Please check Bluetooth is enabled and permissions are granted.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
   const stopScanning = () => {
-    BluetoothService.stopScanning();
-    setIsScanning(false);
+    try {
+      BluetoothService.stopScanning();
+      // Clear interval if it exists
+      if ((global as any).__scanInterval) {
+        clearInterval((global as any).__scanInterval);
+        (global as any).__scanInterval = null;
+      }
+      setIsScanning(false);
+    } catch (error) {
+      console.error('Error stopping scan:', error);
+      setIsScanning(false);
+    }
   };
 
   const testSOSAlert = () => {
@@ -110,7 +145,14 @@ const App = () => {
       </View>
 
       <View style={styles.controls}>
-        {!isScanning ? (
+        {!isReady ? (
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: '#9ca3af' }]}
+            disabled
+          >
+            <Text style={styles.buttonText}>⏳ Initializing...</Text>
+          </TouchableOpacity>
+        ) : !isScanning ? (
           <TouchableOpacity
             style={[styles.button, styles.buttonPrimary]}
             onPress={startScanning}
