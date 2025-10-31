@@ -40,6 +40,22 @@ export const API_ENDPOINTS = {
 } as const;
 
 /**
+ * Get ESP8266 device URL for triggering SOS alerts
+ * Configure via VITE_ESP8266_URL environment variable, or it will try to detect from current hostname
+ */
+export const getESP8266Url = (): string | null => {
+  // Use environment variable if set
+  if (import.meta.env.VITE_ESP8266_URL) {
+    return import.meta.env.VITE_ESP8266_URL;
+  }
+  
+  // If no ESP8266 URL is configured, return null (device won't be notified)
+  // User should set VITE_ESP8266_URL in .env file with the ESP8266 IP address
+  // Example: VITE_ESP8266_URL=http://192.168.1.100
+  return null;
+};
+
+/**
  * Helper function to build URL with query parameters
  */
 export function buildUrl(endpoint: string, params?: Record<string, string | number>): string {

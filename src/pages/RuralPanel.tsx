@@ -8,7 +8,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmergencyType } from "@/types/emergency";
 import { getEmergenciesFromStorage, saveEmergenciesToStorage } from "@/lib/mockData";
-import { API_ENDPOINTS, apiRequest } from "@/lib/api";
+import { API_ENDPOINTS, apiRequest, getESP8266Url } from "@/lib/api";
 import { motion } from "framer-motion";
 
 export default function RuralPanel() {
@@ -109,6 +109,31 @@ export default function RuralPanel() {
           toast.error("Saved locally. Sync to server failed.", {
             description: error instanceof Error ? error.message : "Please check backend server",
           });
+        }
+      })();
+
+      // Notify ESP8266 device (non-blocking, silent failure if device unavailable)
+      (async () => {
+        const esp8266Url = getESP8266Url();
+        if (esp8266Url) {
+          try {
+            const espResponse = await fetch(`${esp8266Url}/trigger-sos`, {
+              method: "POST",
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ emergencyId: newEmergency.id }),
+            });
+            
+            if (espResponse.ok) {
+              console.log("ESP8266 notified successfully");
+            } else {
+              console.warn("ESP8266 notification failed:", espResponse.status);
+            }
+          } catch (error) {
+            // Silent failure - ESP8266 might be offline, don't block SOS submission
+            console.warn("ESP8266 device unavailable:", error);
+          }
         }
       })();
 
