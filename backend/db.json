@@ -44,25 +44,12 @@
       "phone": "4-343",
       "type": "Pregnancy",
       "time": "12:43 AM",
-      "status": "Pending",
+      "status": "Resolved",
       "lat": 27.651333058676965,
       "lng": 85.45282755549111
     }
   ],
   "hospitals": [],
-  "volunteers": [
-    {
-      "name": "test",
-      "phone": "23423423",
-      "bloodGroup": "A+",
-      "ambulanceId": "2",
-      "status": "available",
-      "location": {
-        "lat": 27.65,
-        "lng": 85.45
-      },
-      "id": "v1761935900100"
-    }
-  ],
+  "volunteers": [],
   "ambulances": []
 }
