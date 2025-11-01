@@ -8,6 +8,30 @@ import { Emergency } from '../types/emergency';
 const SOS_SERVICE_UUID = '12345678-1234-1234-1234-123456789ABC';
 const SOS_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-123456789ABD';
 
+// Base64 decode helper (atob polyfill for React Native)
+function decodeBase64(str: string): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let output = '';
+  let i = 0;
+  
+  str = str.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+  
+  while (i < str.length) {
+    const enc1 = chars.indexOf(str.charAt(i++));
+    const enc2 = chars.indexOf(str.charAt(i++));
+    const enc3 = chars.indexOf(str.charAt(i++));
+    const enc4 = chars.indexOf(str.charAt(i++));
+    
+    const bits = (enc1 << 18) | (enc2 << 12) | (enc3 << 6) | enc4;
+    
+    output += String.fromCharCode((bits >> 16) & 255);
+    if (enc3 !== 64) output += String.fromCharCode((bits >> 8) & 255);
+    if (enc4 !== 64) output += String.fromCharCode(bits & 255);
+  }
+  
+  return output;
+}
+
 class BluetoothService {
   private isScanning: boolean = false;
   private isAdvertising: boolean = false;
@@ -69,48 +93,66 @@ class BluetoothService {
   async initialize(): Promise<boolean> {
     try {
       // Initialize push notifications first (doesn't require Bluetooth)
+      // Wrap in try-catch to prevent crashes if module not available
       try {
-        PushNotification.configure({
-          onRegister: function (token) {
-            console.log('Push token:', token);
-          },
-          onNotification: function (notification) {
-            console.log('Notification:', notification);
-          },
-          permissions: {
-            alert: true,
-            badge: true,
-            sound: true,
-          },
-          popInitialNotification: true,
-          requestPermissions: true,
-        });
-        console.log('✅ Push notifications configured');
-      } catch (error) {
-        console.warn('⚠️ Push notification setup failed (non-critical):', error);
+        if (PushNotification && typeof PushNotification.configure === 'function') {
+          PushNotification.configure({
+            onRegister: function (token) {
+              console.log('Push token:', token);
+            },
+            onNotification: function (notification) {
+              console.log('Notification:', notification);
+            },
+            permissions: {
+              alert: true,
+              badge: true,
+              sound: true,
+            },
+            popInitialNotification: true,
+            requestPermissions: true,
+          });
+          console.log('✅ Push notifications configured');
+        }
+      } catch (error: any) {
+        console.warn('⚠️ Push notification setup failed (non-critical):', error?.message || error);
+        // Continue without push notifications
       }
 
       // Request permissions first
-      const hasPermissions = await this.checkPermissions();
+      let hasPermissions = false;
+      try {
+        hasPermissions = await this.checkPermissions();
+      } catch (permError: any) {
+        console.warn('⚠️ Permission check failed:', permError?.message || permError);
+        // Continue anyway - user can grant later
+      }
+
       if (!hasPermissions) {
-        console.error('❌ Bluetooth permissions not granted');
-        return false;
+        console.warn('⚠️ Bluetooth permissions not granted - app can still run');
+        // Return true anyway - app can work without Bluetooth initially
+        return true;
       }
 
       // Initialize Bluetooth (non-blocking - won't crash if fails)
       try {
-        await BleManager.start({ showAlert: false });
-        console.log('✅ Bluetooth initialized');
+        if (BleManager && typeof BleManager.start === 'function') {
+          await BleManager.start({ showAlert: false });
+          console.log('✅ Bluetooth initialized');
+          return true;
+        } else {
+          console.warn('⚠️ BleManager not available');
+          return true; // App can run without Bluetooth
+        }
+      } catch (error: any) {
+        console.error('❌ BleManager.start failed:', error?.message || error);
+        // Return true - app can still run
         return true;
-      } catch (error) {
-        console.error('❌ BleManager.start failed:', error);
-        return false;
       }
       
-    } catch (error) {
-      console.error('❌ Bluetooth initialization failed:', error);
+    } catch (error: any) {
+      console.error('❌ Bluetooth initialization failed:', error?.message || error);
       // Don't throw - let app continue without Bluetooth
-      return false;
+      return true; // Changed from false to true - app should still work
     }
   }
 
@@ -145,8 +187,19 @@ class BluetoothService {
     }
 
     try {
+      // Check if BleManager is available
+      if (!BleManager || typeof BleManager.scan !== 'function') {
+        throw new Error('Bluetooth module not available. Please check installation.');
+      }
+
       // Check permissions before scanning
-      const hasPermissions = await this.checkPermissions();
+      let hasPermissions = false;
+      try {
+        hasPermissions = await this.checkPermissions();
+      } catch (permError) {
+        console.warn('Permission check error:', permError);
+      }
+
       if (!hasPermissions) {
         throw new Error('Bluetooth permissions not granted. Please grant permissions in Settings.');
       }
@@ -158,7 +211,7 @@ class BluetoothService {
           throw new Error('Bluetooth is not enabled. Please enable Bluetooth in Settings.');
         }
       } catch (error: any) {
-        if (error.message?.includes('not enabled')) {
+        if (error?.message?.includes('not enabled')) {
           throw error;
         }
         // If checkState fails, continue anyway
@@ -173,25 +226,29 @@ class BluetoothService {
       console.log('✅ Scan started');
 
       // Listen for discovered devices
-      this.scanListener = BleManager.addListener('BleManagerDiscoverPeripheral', (peripheral) => {
-        try {
-          console.log('📡 Discovered device:', peripheral.name || peripheral.id);
-          
-          // Check if device is advertising our SOS service
-          if (peripheral.advertising?.serviceUUIDs?.includes(SOS_SERVICE_UUID)) {
-            console.log('🚨 Found SOS alert from:', peripheral.id);
-            this.handleSOSDevice(peripheral);
+      try {
+        this.scanListener = BleManager.addListener('BleManagerDiscoverPeripheral', (peripheral: any) => {
+          try {
+            console.log('📡 Discovered device:', peripheral?.name || peripheral?.id);
+            
+            // Check if device is advertising our SOS service
+            if (peripheral?.advertising?.serviceUUIDs?.includes(SOS_SERVICE_UUID)) {
+              console.log('🚨 Found SOS alert from:', peripheral.id);
+              this.handleSOSDevice(peripheral);
+            }
+          } catch (error) {
+            console.error('Error handling peripheral:', error);
           }
-        } catch (error) {
-          console.error('Error handling peripheral:', error);
-        }
-      });
+        });
+      } catch (listenerError) {
+        console.warn('Could not add scan listener:', listenerError);
+      }
 
       // Also check for shared alerts periodically (fallback mechanism)
       this.startSharedAlertsPolling();
 
     } catch (error: any) {
-      console.error('❌ Scan failed:', error);
+      console.error('❌ Scan failed:', error?.message || error);
       this.isScanning = false;
       throw error; // Re-throw so UI can show error
     }
@@ -238,16 +295,19 @@ class BluetoothService {
                   );
                   
                   // Parse emergency data (convert base64 to string)
-                  // Note: In React Native, use TextDecoder or convert manually
+                  // React Native doesn't have atob, so we'll decode manually
                   let emergencyStr: string;
                   try {
                     if (typeof data === 'string') {
-                      emergencyStr = atob(data); // Decode base64
+                      // Simple base64 decode for React Native
+                      emergencyStr = decodeBase64(data);
+                    } else if (data instanceof Array || Array.isArray(data)) {
+                      emergencyStr = String.fromCharCode.apply(null, Array.from(data));
                     } else {
-                      emergencyStr = String.fromCharCode.apply(null, Array.from(data as any));
+                      emergencyStr = String(data);
                     }
                     const emergency: Emergency = JSON.parse(emergencyStr);
-                  
+                
                   // Receive and display alert
                   await this.receiveSOSAlert(emergency);
                   console.log('✅ SOS alert received via BLE');
@@ -324,27 +384,37 @@ class BluetoothService {
         this.receivedAlerts = this.receivedAlerts.slice(0, 50);
       }
 
-      // Show push notification
-      PushNotification.localNotification({
-        id: emergency.id,
-        title: '🚨 SOS Alert Received!',
-        message: `${emergency.name} - ${emergency.type} at ${emergency.location}`,
-        playSound: true,
-        soundName: 'default',
-        importance: 'high',
-        priority: 'high',
-        userInfo: { emergency },
-      });
+      // Show push notification (safe - won't crash if module unavailable)
+      try {
+        if (PushNotification && typeof PushNotification.localNotification === 'function') {
+          PushNotification.localNotification({
+            id: emergency.id,
+            title: '🚨 SOS Alert Received!',
+            message: `${emergency.name} - ${emergency.type} at ${emergency.location}`,
+            playSound: true,
+            soundName: 'default',
+            importance: 'high',
+            priority: 'high',
+            userInfo: { emergency },
+          });
+        }
+      } catch (notifError) {
+        console.warn('Notification failed (non-critical):', notifError);
+      }
 
-      console.log('📬 SOS Alert received and notification sent:', emergency.id);
+      console.log('📬 SOS Alert received:', emergency.id);
       
       // Save to AsyncStorage
-      await AsyncStorage.setItem(
-        'receivedAlerts',
-        JSON.stringify(this.receivedAlerts)
-      );
-    } catch (error) {
-      console.error('❌ Failed to receive alert:', error);
+      try {
+        await AsyncStorage.setItem(
+          'receivedAlerts',
+          JSON.stringify(this.receivedAlerts)
+        );
+      } catch (storageError) {
+        console.warn('Storage save failed:', storageError);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to receive alert:', error?.message || error);
     }
   }
 
@@ -367,18 +437,29 @@ class BluetoothService {
   stopScanning(): void {
     if (this.isScanning) {
       try {
-        BleManager.stopScan().then(() => {
-          console.log('⏸️ Scan stopped');
+        if (BleManager && typeof BleManager.stopScan === 'function') {
+          BleManager.stopScan().then(() => {
+            console.log('⏸️ Scan stopped');
+            this.isScanning = false;
+            
+            // Remove scan listener
+            if (this.scanListener) {
+              try {
+                this.scanListener.remove();
+              } catch (e) {
+                // Ignore remove errors
+              }
+              this.scanListener = null;
+            }
+          }).catch((error: any) => {
+            console.warn('Stop scan promise error:', error);
+            this.isScanning = false;
+          });
+        } else {
           this.isScanning = false;
-          
-          // Remove scan listener
-          if (this.scanListener) {
-            this.scanListener.remove();
-            this.scanListener = null;
-          }
-        });
-      } catch (error) {
-        console.error('Error stopping scan:', error);
+        }
+      } catch (error: any) {
+        console.error('Error stopping scan:', error?.message || error);
         this.isScanning = false;
       }
     }

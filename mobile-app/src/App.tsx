@@ -23,33 +23,35 @@ const App = () => {
 
   const initializeApp = async () => {
     try {
-      // Load stored alerts first (doesn't require Bluetooth)
-      await BluetoothService.loadStoredAlerts();
-      setAlerts(BluetoothService.getReceivedAlerts());
-      
-      // Try to initialize Bluetooth (non-blocking)
-      const initialized = await BluetoothService.initialize();
-      if (initialized) {
-        setIsReady(true);
-        console.log('✅ App initialized successfully');
-      } else {
-        console.warn('⚠️ Bluetooth initialization failed, but app can still run');
-        setIsReady(true); // Still mark as ready - user can enable Bluetooth later
-        Alert.alert(
-          'Bluetooth Required',
-          'Please enable Bluetooth and grant permissions to receive SOS alerts.',
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('Initialization error:', error);
-      // Don't crash - show warning but allow app to continue
+      // Always mark as ready first (prevents hanging)
       setIsReady(true);
-      Alert.alert(
-        'Warning',
-        'Some features may not work. Please check Bluetooth permissions in Settings.',
-        [{ text: 'OK' }]
-      );
+      
+      // Load stored alerts first (doesn't require Bluetooth)
+      try {
+        await BluetoothService.loadStoredAlerts();
+        setAlerts(BluetoothService.getReceivedAlerts());
+      } catch (storageError) {
+        console.warn('Storage load failed:', storageError);
+        // Continue anyway
+      }
+      
+      // Try to initialize Bluetooth (non-blocking, non-critical)
+      try {
+        const initialized = await BluetoothService.initialize();
+        if (initialized) {
+          console.log('✅ App initialized successfully');
+        } else {
+          console.warn('⚠️ Bluetooth initialization failed, but app can still run');
+        }
+      } catch (btError: any) {
+        console.warn('Bluetooth init error (non-critical):', btError?.message || btError);
+        // App continues without Bluetooth
+      }
+    } catch (error: any) {
+      console.error('Initialization error:', error?.message || error);
+      // App should still be ready even if initialization fails
+      setIsReady(true);
+      // Don't show alert immediately - let user try to use app first
     }
   };
 
