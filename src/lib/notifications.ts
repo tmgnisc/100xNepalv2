@@ -52,23 +52,35 @@ class NotificationService {
     // Request permission - on mobile, this must be triggered by user interaction
     try {
       console.log("🔐 Requesting notification permission...");
+      
+      // On mobile, permission request must be from user interaction
+      // So we'll request it and handle the response
       const permission = await Notification.requestPermission();
       this.notificationPermission = permission;
       
       if (permission === "granted") {
         console.log("✅ Notification permission granted!");
+        // Re-check permission status immediately
+        this.notificationPermission = Notification.permission;
       } else if (permission === "denied") {
         console.warn("❌ Notification permission denied");
         if (isMobile) {
           console.warn("📱 On mobile: Go to browser → Settings → Site Settings → Notifications → Allow");
+          console.warn("📱 Or use the notification banner at the bottom of the screen");
         }
       } else {
         console.log("⏳ Notification permission default (will ask later)");
+        if (isMobile) {
+          console.log("📱 On mobile: Use the notification banner to enable notifications");
+        }
       }
       
       return permission === "granted";
     } catch (error) {
       console.error("❌ Error requesting notification permission:", error);
+      if (isMobile) {
+        console.error("📱 Mobile: Permission request might require user interaction");
+      }
       return false;
     }
   }

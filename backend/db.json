@@ -1,6 +1,19 @@
 {
   "emergencies": [
     {
+      "id": "E1761971347328",
+      "name": "G",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "9",
+      "type": "Accident",
+      "time": "10:14 AM",
+      "status": "Resolved",
+      "lat": 27.64909259063613,
+      "lng": 85.4526440713004,
+      "createdAt": "2025-11-01T04:29:07.329Z"
+    },
+    {
       "id": "E1761970821589",
       "name": "Dff",
       "wardNo": "Ward 16",
@@ -8,7 +21,7 @@
       "phone": "553",
       "type": "Pregnancy",
       "time": "10:05 AM",
-      "status": "Pending",
+      "status": "Resolved",
       "lat": 27.648566538512554,
       "lng": 85.45392139318824,
       "createdAt": "2025-11-01T04:20:21.589Z"
@@ -551,10 +564,23 @@
       "phone": "553",
       "type": "Pregnancy",
       "time": "10:05 AM",
-      "status": "Pending",
+      "status": "Resolved",
       "lat": 27.648566538512554,
       "lng": 85.45392139318824,
       "createdAt": "2025-11-01T04:20:21.066Z"
+    },
+    {
+      "id": "E1761971347271",
+      "name": "G",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "9",
+      "type": "Accident",
+      "time": "10:14 AM",
+      "status": "Resolved",
+      "lat": 27.64909259063613,
+      "lng": 85.4526440713004,
+      "createdAt": "2025-11-01T04:29:07.301Z"
     }
   ],
   "hospitals": [],

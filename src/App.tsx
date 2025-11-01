@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import NotificationManager from "./components/NotificationManager";
+import NotificationBanner from "./components/NotificationBanner";
 import Home from "./pages/Home";
 import RuralPanel from "./pages/RuralPanel";
 import Municipality from "./pages/Municipality";
@@ -23,6 +24,7 @@ const App = () => (
       <Toaster />
       <Sonner position="top-center" />
       <NotificationManager />
+      <NotificationBanner />
       <BrowserRouter>
         <Navbar />
         <Routes>
