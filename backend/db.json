@@ -131,6 +131,18 @@
       "status": "Resolved",
       "lat": 27.6545644543923,
       "lng": 85.45355029968539
+    },
+    {
+      "id": "E1761962284233",
+      "name": "Ff",
+      "wardNo": "Ward 16",
+      "location": "Tamaghat",
+      "phone": "58",
+      "type": "Pregnancy",
+      "time": "07:43 AM",
+      "status": "Resolved",
+      "lat": 27.649827211787752,
+      "lng": 85.44735408187731
     }
   ],
   "hospitals": [],

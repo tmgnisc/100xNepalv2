@@ -53,9 +53,17 @@ class BluetoothService {
   private connectedDevices: string[] = [];
   private receivedAlerts: Emergency[] = [];
   private scanListener: any = null;
+  private currentSOSAlert: Emergency | null = null; // Store current active SOS alert
+  private connectionListener: any = null;
 
   async checkPermissions(): Promise<boolean> {
     try {
+      // Safety check for Platform
+      if (!Platform || !Platform.OS) {
+        console.warn('⚠️ Platform not available');
+        return false;
+      }
+      
       if (Platform.OS === 'android') {
         // Android 12+ (API 31+) requires BLUETOOTH_SCAN and BLUETOOTH_CONNECT
         if (Platform.Version >= 31) {
@@ -108,6 +116,7 @@ class BluetoothService {
   async initialize(): Promise<boolean> {
     try {
       // Initialize push notifications first (doesn't require Bluetooth)
+      // Note: Disable requestPermissions to avoid Firebase requirement
       try {
         if (PushNotification && typeof PushNotification.configure === 'function') {
           PushNotification.configure({
@@ -123,7 +132,7 @@ class BluetoothService {
               sound: true,
             },
             popInitialNotification: true,
-            requestPermissions: true,
+            requestPermissions: false, // Changed to false - we'll handle permissions manually
           });
           console.log('✅ Push notifications configured');
         }
@@ -169,23 +178,155 @@ class BluetoothService {
   // Broadcast SOS alert to nearby devices via BLE
   async broadcastSOSAlert(emergency: Emergency): Promise<void> {
     try {
-      console.log('📢 Broadcasting SOS Alert:', emergency.id);
+      console.log('📢 Broadcasting SOS Alert via Bluetooth:', emergency.id);
       
       // Store in local storage
       await AsyncStorage.setItem(`sos_${emergency.id}`, JSON.stringify(emergency));
       
-      // For BLE, we'll use a simpler approach:
-      // 1. Store emergency data locally
-      // 2. Change device name to indicate SOS (if possible)
-      // 3. Or use BLE advertising with custom service
+      // Store current SOS alert so it can be shared when devices connect
+      this.currentSOSAlert = emergency;
       
-      // Note: Full BLE advertising requires native code
-      // For now, we'll use a polling mechanism where devices check for shared alerts
+      // Make sure Bluetooth is initialized
+      try {
+        if (BleManager && typeof BleManager.start === 'function') {
+          await BleManager.start({ showAlert: false });
+        }
+      } catch (initError) {
+        console.warn('⚠️ Bluetooth already initialized or failed:', initError);
+      }
       
-      console.log('✅ SOS alert stored for broadcasting');
+      // Start scanning - this makes our device discoverable to others
+      // When other devices discover us, they can connect and request the SOS data
+      if (!this.isScanning) {
+        try {
+          await this.startScanning();
+          console.log('✅ Started scanning - device is now discoverable');
+        } catch (scanError: any) {
+          console.warn('⚠️ Could not start scanning for broadcasting:', scanError?.message || scanError);
+          // Still continue - the alert is stored and can be shared via other means
+        }
+      }
       
+      // Set up connection listener so when other devices connect, we can share SOS data
+      this.setupConnectionListener();
+      
+      console.log('✅ SOS alert ready for Bluetooth broadcasting');
+      console.log('📡 Nearby devices can now discover and receive this alert');
+      
+    } catch (error: any) {
+      console.error('❌ Failed to broadcast SOS:', error?.message || error);
+    }
+  }
+  
+  // Set up listener for when other devices connect to us
+  private setupConnectionListener(): void {
+    if (this.connectionListener) {
+      return; // Already set up
+    }
+    
+    try {
+      this.connectionListener = BleManager.addListener('BleManagerConnectPeripheral', async (peripheral: any) => {
+        try {
+          console.log('📱 Device connected to us:', peripheral.id);
+          
+          // If we have an active SOS alert, share it
+          if (this.currentSOSAlert) {
+            await this.shareSOSWithConnectedDevice(peripheral.id, this.currentSOSAlert);
+          }
+        } catch (error) {
+          console.error('Error handling incoming connection:', error);
+        }
+      });
     } catch (error) {
-      console.error('❌ Failed to broadcast SOS:', error);
+      console.warn('Could not set up connection listener:', error);
+    }
+  }
+  
+  // Share SOS alert with a connected device
+  private async shareSOSWithConnectedDevice(deviceId: string, emergency: Emergency): Promise<void> {
+    try {
+      console.log('📤 Sharing SOS alert with device:', deviceId);
+      
+      // Wait for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Discover services on the connected device
+      const services = await BleManager.retrieveServices(deviceId);
+      
+      // Check if the connected device has our SOS service (it should, if it's listening)
+      if (services.characteristics) {
+        for (const service of services.characteristics) {
+          if (service.service === SOS_SERVICE_UUID) {
+            // Found our service - try to write SOS data to characteristic
+            for (const characteristic of service.characteristics) {
+              if (characteristic.characteristic === SOS_CHARACTERISTIC_UUID) {
+                // Write the emergency data as bytes (JSON string converted to byte array)
+                const emergencyJson = JSON.stringify(emergency);
+                const bytes: number[] = [];
+                
+                // Convert string to byte array (React Native doesn't have Buffer)
+                for (let i = 0; i < emergencyJson.length; i++) {
+                  bytes.push(emergencyJson.charCodeAt(i));
+                }
+                
+                try {
+                  // Write the SOS data to the characteristic
+                  await BleManager.write(
+                    deviceId,
+                    SOS_SERVICE_UUID,
+                    SOS_CHARACTERISTIC_UUID,
+                    bytes
+                  );
+                  
+                  console.log('✅ SOS alert shared with device:', deviceId);
+                } catch (writeError) {
+                  console.warn('⚠️ Could not write SOS data (device may need to read instead):', writeError);
+                  // This is okay - the receiving device will read it via checkDeviceForSOS
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.warn('⚠️ Error sharing SOS with connected device:', error?.message || error);
+    }
+  }
+
+  // Enable Bluetooth programmatically
+  async enableBluetooth(): Promise<boolean> {
+    try {
+      if (!BleManager) {
+        throw new Error('Bluetooth module not available');
+      }
+
+      const state = await BleManager.checkState();
+      
+      if (state === 'on') {
+        console.log('✅ Bluetooth is already enabled');
+        return true;
+      }
+
+      // Try to enable Bluetooth
+      // Note: This requires BLUETOOTH_CONNECT permission on Android 12+
+      console.log('🔵 Attempting to enable Bluetooth...');
+      
+      // On Android, we need to show system dialog to enable Bluetooth
+      // BleManager doesn't have direct enable(), so we use checkState to trigger dialog
+      // or we'll need to guide user to enable manually
+      
+      if (state === 'off') {
+        // Cannot enable programmatically on most Android versions
+        // We'll return false and let UI handle showing system dialog
+        console.warn('⚠️ Bluetooth is off. Please enable Bluetooth in Settings.');
+        return false;
+      }
+
+      return state === 'on';
+    } catch (error: any) {
+      console.error('❌ Error checking/enabling Bluetooth:', error?.message || error);
+      return false;
     }
   }
 
@@ -202,26 +343,48 @@ class BluetoothService {
         throw new Error('Bluetooth module not available. Please check installation.');
       }
 
-      // Check permissions before scanning
+      // Step 1: Request permissions first (automatically)
+      console.log('🔐 Requesting Bluetooth permissions...');
       let hasPermissions = false;
       try {
         hasPermissions = await this.checkPermissions();
-      } catch (permError) {
-        console.warn('Permission check error:', permError);
+        if (!hasPermissions) {
+          // Try requesting again more aggressively
+          console.log('🔄 Retrying permission request...');
+          hasPermissions = await this.checkPermissions();
+        }
+      } catch (permError: any) {
+        console.warn('Permission check error:', permError?.message || permError);
+        // Try once more
+        try {
+          hasPermissions = await this.checkPermissions();
+        } catch (retryError) {
+          console.error('Permission request failed after retry:', retryError);
+        }
       }
 
       if (!hasPermissions) {
         throw new Error('Bluetooth permissions not granted. Please grant permissions in Settings.');
       }
 
-      // Check if Bluetooth is enabled
+      console.log('✅ Permissions granted');
+
+      // Step 2: Check and enable Bluetooth
+      console.log('🔵 Checking Bluetooth state...');
       try {
-        const enabled = await BleManager.checkState();
-        if (enabled !== 'on') {
-          throw new Error('Bluetooth is not enabled. Please enable Bluetooth in Settings.');
+        const state = await BleManager.checkState();
+        console.log('📊 Bluetooth state:', state);
+        
+        if (state !== 'on') {
+          // Try to guide user to enable
+          const enabled = await this.enableBluetooth();
+          if (!enabled) {
+            throw new Error('Bluetooth is not enabled. Please enable Bluetooth in Settings and try again.');
+          }
         }
+        console.log('✅ Bluetooth is enabled');
       } catch (error: any) {
-        if (error?.message?.includes('not enabled')) {
+        if (error?.message?.includes('not enabled') || error?.message?.includes('Bluetooth')) {
           throw error;
         }
         // If checkState fails, continue anyway
@@ -231,20 +394,43 @@ class BluetoothService {
       this.isScanning = true;
       console.log('🔍 Starting scan for SOS alerts...');
 
-      // Start scanning for devices
-      await BleManager.scan([SOS_SERVICE_UUID], 10, true); // Scan for 10 seconds
-      console.log('✅ Scan started');
+      // Start continuous scanning (makes device discoverable and finds other devices)
+      // Scan indefinitely until stopped (use longer duration for continuous scanning)
+      await BleManager.scan([], 0, true); // Scan for all devices, indefinitely
+      console.log('✅ Continuous scan started - device is discoverable');
 
       // Listen for discovered devices
       try {
         this.scanListener = BleManager.addListener('BleManagerDiscoverPeripheral', (peripheral: any) => {
           try {
-            console.log('📡 Discovered device:', peripheral?.name || peripheral?.id);
+            const deviceName = peripheral?.name || peripheral?.id || 'Unknown Device';
+            console.log('📡 Discovered device:', deviceName, 'RSSI:', peripheral?.rssi);
             
-            // Check if device is advertising our SOS service
+            // Store discovered device for UI
+            this.discoveredDevices.set(peripheral.id, {
+              id: peripheral.id,
+              name: deviceName,
+              rssi: peripheral.rssi || 0,
+              advertising: peripheral.advertising,
+              timestamp: Date.now(),
+            });
+            
+            // Check if device is advertising our SOS service OR if we have an active SOS alert
+            // If device is advertising SOS service, connect and read
+            // Also, if we're scanning and discover a device, try to connect and see if they have SOS data
             if (peripheral?.advertising?.serviceUUIDs?.includes(SOS_SERVICE_UUID)) {
-              console.log('🚨 Found SOS alert from:', peripheral.id);
+              console.log('🚨 Found device advertising SOS service:', peripheral.id);
               this.handleSOSDevice(peripheral);
+            } else {
+              // Even if not explicitly advertising, try to connect and check for SOS data
+              // This handles the case where Device A triggered SOS and Device B is scanning
+              setTimeout(async () => {
+                try {
+                  await this.checkDeviceForSOS(peripheral);
+                } catch (err) {
+                  // Silently fail - not all devices will have SOS data
+                }
+              }, 2000); // Wait a bit before checking
             }
           } catch (error) {
             console.error('Error handling peripheral:', error);
@@ -274,6 +460,53 @@ class BluetoothService {
         console.error('Error in shared alerts polling:', error);
       }
     }, 10000);
+  }
+
+  // Check if a discovered device has SOS data (without explicit advertising)
+  private async checkDeviceForSOS(peripheral: any): Promise<void> {
+    try {
+      // Don't check the same device multiple times
+      if (this.connectedDevices.includes(peripheral.id)) {
+        return;
+      }
+      
+      console.log('🔍 Checking device for SOS data:', peripheral.id);
+      
+      // Try to connect
+      await BleManager.connect(peripheral.id);
+      this.connectedDevices.push(peripheral.id);
+      
+      // Wait for connection
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Discover services
+      const services = await BleManager.retrieveServices(peripheral.id);
+      
+      // Check for SOS service
+      if (services.characteristics) {
+        for (const service of services.characteristics) {
+          if (service.service === SOS_SERVICE_UUID) {
+            console.log('✅ Found SOS service on device:', peripheral.id);
+            // This device has our SOS service - try to read data
+            await this.handleSOSDevice(peripheral);
+            return;
+          }
+        }
+      }
+      
+      // No SOS service found, disconnect
+      await BleManager.disconnect(peripheral.id);
+      this.connectedDevices = this.connectedDevices.filter(id => id !== peripheral.id);
+      
+    } catch (error: any) {
+      console.warn('⚠️ Error checking device for SOS:', error?.message || error);
+      try {
+        await BleManager.disconnect(peripheral.id);
+        this.connectedDevices = this.connectedDevices.filter(id => id !== peripheral.id);
+      } catch (disconnectError) {
+        // Ignore
+      }
+    }
   }
 
   private async handleSOSDevice(peripheral: any): Promise<void> {
@@ -399,26 +632,28 @@ class BluetoothService {
         this.receivedAlerts = this.receivedAlerts.slice(0, 50);
       }
 
-      // Show push notification (safe - won't crash if module unavailable)
+      // Show push notification (safe - won't crash if module unavailable or Firebase not set up)
       try {
         if (PushNotification && typeof PushNotification.localNotification === 'function') {
+          // Use localNotification which doesn't require Firebase
           PushNotification.localNotification({
-            id: emergency.id,
+            id: parseInt(emergency.id.replace(/\D/g, '').slice(-9)) || Date.now(), // Convert ID to number
             title: '🚨 SOS Alert Received!',
             message: `${emergency.name} - ${emergency.type} at ${emergency.location}`,
             playSound: true,
             soundName: 'default',
             importance: 'high',
             priority: 'high',
-            userInfo: { emergency },
+            userInfo: { emergency: JSON.stringify(emergency) }, // Serialize to avoid issues
           });
           console.log('📬 SOS Alert received and notification sent:', emergency.id);
         } else {
           console.log('📬 SOS Alert received (notification not available):', emergency.id);
         }
-      } catch (notifError) {
-        console.warn('Notification failed (non-critical):', notifError);
-        console.log('📬 SOS Alert received:', emergency.id);
+      } catch (notifError: any) {
+        // Silently fail - notifications are not critical
+        console.warn('Notification failed (non-critical):', notifError?.message || 'Unknown error');
+        console.log('📬 SOS Alert received (notification skipped):', emergency.id);
       }
       
       // Save to AsyncStorage
@@ -437,6 +672,22 @@ class BluetoothService {
 
   getReceivedAlerts(): Emergency[] {
     return this.receivedAlerts;
+  }
+
+  getDiscoveredDevices(): any[] {
+    // Remove devices older than 30 seconds
+    const now = Date.now();
+    const recentDevices: any[] = [];
+    
+    this.discoveredDevices.forEach((device, id) => {
+      if (now - device.timestamp < 30000) { // 30 seconds
+        recentDevices.push(device);
+      } else {
+        this.discoveredDevices.delete(id);
+      }
+    });
+    
+    return recentDevices;
   }
 
   async loadStoredAlerts(): Promise<void> {

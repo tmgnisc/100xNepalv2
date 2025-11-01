@@ -16,7 +16,9 @@ const App = () => {
   const [isReady, setIsReady] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [alerts, setAlerts] = useState<Emergency[]>([]);
+  const [discoveredDevices, setDiscoveredDevices] = useState<any[]>([]);
   const alertCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const deviceUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     initializeApp();
@@ -78,7 +80,18 @@ const App = () => {
   const startScanning = async () => {
     try {
       setIsScanning(true);
+      
+      // Show loading state
+      Alert.alert(
+        'Starting...',
+        'Requesting permissions and enabling Bluetooth...',
+        [],
+        { cancelable: false }
+      );
+
       await BluetoothService.startScanning();
+      
+      // Dismiss loading alert
       
       // Check for alerts periodically
       alertCheckIntervalRef.current = setInterval(async () => {
@@ -91,25 +104,78 @@ const App = () => {
         }
       }, 5000); // Check every 5 seconds
       
+      // Update discovered devices list
+      deviceUpdateIntervalRef.current = setInterval(() => {
+        try {
+          const devices = BluetoothService.getDiscoveredDevices();
+          setDiscoveredDevices([...devices]);
+        } catch (error) {
+          console.error('Error getting discovered devices:', error);
+        }
+      }, 2000); // Update every 2 seconds
+      
+      Alert.alert(
+        '✅ Listening Started',
+        'App is now listening for SOS alerts from nearby devices.',
+        [{ text: 'OK' }]
+      );
+      
     } catch (error: any) {
       console.error('Scan error:', error);
       setIsScanning(false);
-      Alert.alert(
-        'Scan Failed',
-        error?.message || 'Failed to start scanning. Please check Bluetooth is enabled and permissions are granted.',
-        [{ text: 'OK' }]
-      );
+      
+      const errorMessage = error?.message || 'Failed to start scanning.';
+      
+      // Provide actionable error messages
+      if (errorMessage.includes('permission')) {
+        Alert.alert(
+          'Permission Required',
+          'Bluetooth permissions are required. Please grant permissions when prompted, or enable them in Settings → Apps → AarogyaConnect → Permissions.',
+          [
+            { text: 'Open Settings', onPress: () => {
+              // Try to open settings (platform specific)
+              if (Platform.OS === 'android') {
+                // On Android, we can't directly open app settings directly, but user can do it
+              }
+            }},
+            { text: 'OK' }
+          ]
+        );
+      } else if (errorMessage.includes('Bluetooth') && errorMessage.includes('not enabled')) {
+        Alert.alert(
+          'Bluetooth Required',
+          'Please enable Bluetooth in your device settings and try again.',
+          [
+            { text: 'Enable Bluetooth', onPress: () => {
+              // Try to open Bluetooth settings
+              // On Android, we can't directly enable, but we can guide
+            }},
+            { text: 'OK' }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Scan Failed',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
   const stopScanning = () => {
     try {
       BluetoothService.stopScanning();
-      // Clear interval if it exists
+      // Clear intervals if they exist
       if (alertCheckIntervalRef.current) {
         clearInterval(alertCheckIntervalRef.current);
         alertCheckIntervalRef.current = null;
       }
+      if (deviceUpdateIntervalRef.current) {
+        clearInterval(deviceUpdateIntervalRef.current);
+        deviceUpdateIntervalRef.current = null;
+      }
+      setDiscoveredDevices([]);
       setIsScanning(false);
     } catch (error) {
       console.error('Error stopping scan:', error);
