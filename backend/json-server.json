@@ -3,7 +3,7 @@
   "host": "0.0.0.0",
   "watch": true,
   "routes": "routes.json",
-  "middlewares": [],
+  "middlewares": ["./middleware.cjs"],
   "static": "./public",
   "readOnly": false,
   "noCors": false,

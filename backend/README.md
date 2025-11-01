@@ -40,6 +40,19 @@ Base URL: `http://localhost:3001`
 - `PATCH /api/emergencies/:id` - Partial update emergency
 - `DELETE /api/emergencies/:id` - Delete emergency
 
+### SOS Alert (Custom Endpoint)
+- `POST /api/sos-alert` - **Trigger SOS alert** (saves to emergencies)
+- `GET /api/sos-alert` - Get API documentation
+
+**Example:**
+```bash
+curl -X POST http://localhost:3001/api/sos-alert \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","location":"Tamaghat","type":"Accident"}'
+```
+
+See `SOS_API_DOCS.md` for complete documentation.
+
 ### Hospitals
 - `GET /api/hospitals` - Get all hospitals
 - `GET /api/hospitals/:id` - Get hospital by ID

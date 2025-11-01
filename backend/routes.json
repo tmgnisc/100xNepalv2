@@ -6,6 +6,7 @@
   "/api/volunteers": "/volunteers",
   "/api/volunteers/:id": "/volunteers/:id",
   "/api/ambulances": "/ambulances",
-  "/api/ambulances/:id": "/ambulances/:id"
+  "/api/ambulances/:id": "/ambulances/:id",
+  "/api/sos-alert": "/sos-alert"
 }
 
