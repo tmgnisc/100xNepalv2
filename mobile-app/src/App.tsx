@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -16,42 +16,62 @@ const App = () => {
   const [isReady, setIsReady] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [alerts, setAlerts] = useState<Emergency[]>([]);
+  const alertCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     initializeApp();
+    
+    // Cleanup on unmount
+    return () => {
+      if (alertCheckIntervalRef.current) {
+        clearInterval(alertCheckIntervalRef.current);
+      }
+    };
   }, []);
 
   const initializeApp = async () => {
     try {
-      // Always mark as ready first (prevents hanging)
-      setIsReady(true);
-      
       // Load stored alerts first (doesn't require Bluetooth)
       try {
         await BluetoothService.loadStoredAlerts();
         setAlerts(BluetoothService.getReceivedAlerts());
-      } catch (storageError) {
-        console.warn('Storage load failed:', storageError);
+      } catch (loadError) {
+        console.warn('Failed to load stored alerts:', loadError);
         // Continue anyway
       }
       
-      // Try to initialize Bluetooth (non-blocking, non-critical)
+      // Try to initialize Bluetooth (non-blocking)
       try {
         const initialized = await BluetoothService.initialize();
         if (initialized) {
+          setIsReady(true);
           console.log('✅ App initialized successfully');
         } else {
           console.warn('⚠️ Bluetooth initialization failed, but app can still run');
+          setIsReady(true); // Still mark as ready - user can enable Bluetooth later
+          // Don't show alert immediately - let user try when ready
         }
-      } catch (btError: any) {
-        console.warn('Bluetooth init error (non-critical):', btError?.message || btError);
-        // App continues without Bluetooth
+      } catch (initError: any) {
+        console.error('Bluetooth initialization error:', initError);
+        setIsReady(true); // App can still run without Bluetooth
+      }
+      
+      // Make sure we set ready state even if everything fails
+      if (!isReady) {
+        setIsReady(true);
       }
     } catch (error: any) {
       console.error('Initialization error:', error?.message || error);
-      // App should still be ready even if initialization fails
+      // Don't crash - show warning but allow app to continue
       setIsReady(true);
-      // Don't show alert immediately - let user try to use app first
+      // Only show alert if it's a critical error
+      if (error?.message?.includes('critical') || error?.message?.includes('fatal')) {
+        Alert.alert(
+          'Warning',
+          'Some features may not work. Please check Bluetooth permissions in Settings.',
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
@@ -61,7 +81,7 @@ const App = () => {
       await BluetoothService.startScanning();
       
       // Check for alerts periodically
-      const interval = setInterval(async () => {
+      alertCheckIntervalRef.current = setInterval(async () => {
         try {
           await BluetoothService.checkForSharedAlerts();
           const updatedAlerts = BluetoothService.getReceivedAlerts();
@@ -70,9 +90,6 @@ const App = () => {
           console.error('Error checking alerts:', error);
         }
       }, 5000); // Check every 5 seconds
-
-      // Store interval for cleanup
-      (global as any).__scanInterval = interval;
       
     } catch (error: any) {
       console.error('Scan error:', error);
@@ -89,9 +106,9 @@ const App = () => {
     try {
       BluetoothService.stopScanning();
       // Clear interval if it exists
-      if ((global as any).__scanInterval) {
-        clearInterval((global as any).__scanInterval);
-        (global as any).__scanInterval = null;
+      if (alertCheckIntervalRef.current) {
+        clearInterval(alertCheckIntervalRef.current);
+        alertCheckIntervalRef.current = null;
       }
       setIsScanning(false);
     } catch (error) {
@@ -100,41 +117,51 @@ const App = () => {
     }
   };
 
-  const testSOSAlert = () => {
-    const testEmergency: Emergency = {
-      id: `E${Date.now()}`,
-      name: 'Test User',
-      type: 'Accident',
-      location: 'Test Location',
-      wardNo: 'Ward 16',
-      phone: '1234567890',
-      time: new Date().toLocaleTimeString(),
-      status: 'Pending',
-      lat: 27.6500,
-      lng: 85.4500,
-    };
+  const testSOSAlert = async () => {
+    try {
+      const testEmergency: Emergency = {
+        id: `E${Date.now()}`,
+        name: 'Test User',
+        type: 'Accident',
+        location: 'Test Location',
+        wardNo: 'Ward 16',
+        phone: '1234567890',
+        time: new Date().toLocaleTimeString(),
+        status: 'Pending',
+        lat: 27.6500,
+        lng: 85.4500,
+      };
 
-    BluetoothService.receiveSOSAlert(testEmergency);
-    setAlerts(BluetoothService.getReceivedAlerts());
-    Alert.alert('Test Alert', 'Test SOS alert received!');
+      await BluetoothService.receiveSOSAlert(testEmergency);
+      setAlerts([...BluetoothService.getReceivedAlerts()]);
+      Alert.alert('Test Alert', 'Test SOS alert received!');
+    } catch (error: any) {
+      console.error('Test alert error:', error);
+      Alert.alert('Error', 'Failed to send test alert. Please try again.');
+    }
   };
 
   const broadcastTestSOS = async () => {
-    const testEmergency: Emergency = {
-      id: `E${Date.now()}`,
-      name: 'User A',
-      type: 'Pregnancy',
-      location: 'Tamaghat',
-      wardNo: 'Ward 16',
-      phone: '9876543210',
-      time: new Date().toLocaleTimeString(),
-      status: 'Pending',
-      lat: 27.6500,
-      lng: 85.4500,
-    };
+    try {
+      const testEmergency: Emergency = {
+        id: `E${Date.now()}`,
+        name: 'User A',
+        type: 'Pregnancy',
+        location: 'Tamaghat',
+        wardNo: 'Ward 16',
+        phone: '9876543210',
+        time: new Date().toLocaleTimeString(),
+        status: 'Pending',
+        lat: 27.6500,
+        lng: 85.4500,
+      };
 
-    await BluetoothService.broadcastSOSAlert(testEmergency);
-    Alert.alert('Broadcast', 'SOS alert broadcasted!');
+      await BluetoothService.broadcastSOSAlert(testEmergency);
+      Alert.alert('Broadcast', 'SOS alert broadcasted!');
+    } catch (error: any) {
+      console.error('Broadcast error:', error);
+      Alert.alert('Error', 'Failed to broadcast alert. Please try again.');
+    }
   };
 
   return (

@@ -10,26 +10,41 @@ const SOS_CHARACTERISTIC_UUID = '12345678-1234-1234-1234-123456789ABD';
 
 // Base64 decode helper (atob polyfill for React Native)
 function decodeBase64(str: string): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let output = '';
-  let i = 0;
-  
-  str = str.replace(/[^A-Za-z0-9\+\/\=]/g, '');
-  
-  while (i < str.length) {
-    const enc1 = chars.indexOf(str.charAt(i++));
-    const enc2 = chars.indexOf(str.charAt(i++));
-    const enc3 = chars.indexOf(str.charAt(i++));
-    const enc4 = chars.indexOf(str.charAt(i++));
+  try {
+    // Try native atob first (might be available in some RN versions)
+    if (typeof atob !== 'undefined') {
+      return atob(str);
+    }
     
-    const bits = (enc1 << 18) | (enc2 << 12) | (enc3 << 6) | enc4;
+    // Manual base64 decode for React Native
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let output = '';
+    let i = 0;
     
-    output += String.fromCharCode((bits >> 16) & 255);
-    if (enc3 !== 64) output += String.fromCharCode((bits >> 8) & 255);
-    if (enc4 !== 64) output += String.fromCharCode(bits & 255);
+    str = str.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+    
+    while (i < str.length) {
+      const enc1 = chars.indexOf(str.charAt(i++));
+      const enc2 = chars.indexOf(str.charAt(i++));
+      const enc3 = chars.indexOf(str.charAt(i++));
+      const enc4 = chars.indexOf(str.charAt(i++));
+      
+      if (enc1 === -1 || enc2 === -1 || enc3 === -1 || enc4 === -1) {
+        break;
+      }
+      
+      const bits = (enc1 << 18) | (enc2 << 12) | (enc3 << 6) | enc4;
+      
+      output += String.fromCharCode((bits >> 16) & 255);
+      if (enc3 !== 64) output += String.fromCharCode((bits >> 8) & 255);
+      if (enc4 !== 64) output += String.fromCharCode(bits & 255);
+    }
+    
+    return output;
+  } catch (error) {
+    console.error('Base64 decode error:', error);
+    return '';
   }
-  
-  return output;
 }
 
 class BluetoothService {
@@ -93,7 +108,6 @@ class BluetoothService {
   async initialize(): Promise<boolean> {
     try {
       // Initialize push notifications first (doesn't require Bluetooth)
-      // Wrap in try-catch to prevent crashes if module not available
       try {
         if (PushNotification && typeof PushNotification.configure === 'function') {
           PushNotification.configure({
@@ -115,7 +129,6 @@ class BluetoothService {
         }
       } catch (error: any) {
         console.warn('⚠️ Push notification setup failed (non-critical):', error?.message || error);
-        // Continue without push notifications
       }
 
       // Request permissions first
@@ -124,13 +137,11 @@ class BluetoothService {
         hasPermissions = await this.checkPermissions();
       } catch (permError: any) {
         console.warn('⚠️ Permission check failed:', permError?.message || permError);
-        // Continue anyway - user can grant later
       }
 
       if (!hasPermissions) {
         console.warn('⚠️ Bluetooth permissions not granted - app can still run');
-        // Return true anyway - app can work without Bluetooth initially
-        return true;
+        return true; // App can run without Bluetooth initially
       }
 
       // Initialize Bluetooth (non-blocking - won't crash if fails)
@@ -145,8 +156,7 @@ class BluetoothService {
         }
       } catch (error: any) {
         console.error('❌ BleManager.start failed:', error?.message || error);
-        // Return true - app can still run
-        return true;
+        return true; // App can still run
       }
       
     } catch (error: any) {
@@ -297,6 +307,7 @@ class BluetoothService {
                   // Parse emergency data (convert base64 to string)
                   // React Native doesn't have atob, so we'll decode manually
                   let emergencyStr: string;
+                  let emergency: Emergency;
                   try {
                     if (typeof data === 'string') {
                       // Simple base64 decode for React Native
@@ -306,7 +317,11 @@ class BluetoothService {
                     } else {
                       emergencyStr = String(data);
                     }
-                    const emergency: Emergency = JSON.parse(emergencyStr);
+                    emergency = JSON.parse(emergencyStr);
+                  } catch (parseError) {
+                    console.error('Error parsing emergency data:', parseError);
+                    throw parseError;
+                  }
                 
                   // Receive and display alert
                   await this.receiveSOSAlert(emergency);
@@ -397,12 +412,14 @@ class BluetoothService {
             priority: 'high',
             userInfo: { emergency },
           });
+          console.log('📬 SOS Alert received and notification sent:', emergency.id);
+        } else {
+          console.log('📬 SOS Alert received (notification not available):', emergency.id);
         }
       } catch (notifError) {
         console.warn('Notification failed (non-critical):', notifError);
+        console.log('📬 SOS Alert received:', emergency.id);
       }
-
-      console.log('📬 SOS Alert received:', emergency.id);
       
       // Save to AsyncStorage
       try {
@@ -413,8 +430,8 @@ class BluetoothService {
       } catch (storageError) {
         console.warn('Storage save failed:', storageError);
       }
-    } catch (error: any) {
-      console.error('❌ Failed to receive alert:', error?.message || error);
+    } catch (error) {
+      console.error('❌ Failed to receive alert:', error);
     }
   }
 
