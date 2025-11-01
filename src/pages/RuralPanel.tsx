@@ -36,17 +36,18 @@ export default function RuralPanel() {
         // Tamaghat area coordinates (same as municipality map)
         lat: 27.6500 + (Math.random() - 0.5) * 0.01,
         lng: 85.4500 + (Math.random() - 0.5) * 0.01,
+        createdAt: new Date().toISOString(), // ISO timestamp for notification tracking
       };
 
       const existingEmergencies = getEmergenciesFromStorage();
       saveEmergenciesToStorage([newEmergency, ...existingEmergencies]);
 
-      // Also persist to backend (json-server)
+      // Also persist to backend (json-server) - call both endpoints
       (async () => {
         try {
           console.log("Sending emergency to backend:", newEmergency);
           
-          // Use direct fetch with proper headers to avoid caching issues
+          // 1. Call the standard emergencies endpoint
           const response = await fetch(API_ENDPOINTS.emergencies, {
             method: "POST",
             headers: {
@@ -56,6 +57,37 @@ export default function RuralPanel() {
             cache: 'no-store',
             body: JSON.stringify(newEmergency),
           });
+          
+          // 2. Also call the SOS alert endpoint
+          (async () => {
+            try {
+              const sosResponse = await fetch(API_ENDPOINTS.sosAlert, {
+                method: "POST",
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                cache: 'no-store',
+                body: JSON.stringify({
+                  name: newEmergency.name,
+                  wardNo: newEmergency.wardNo,
+                  location: newEmergency.location,
+                  phone: newEmergency.phone,
+                  type: newEmergency.type,
+                  lat: newEmergency.lat,
+                  lng: newEmergency.lng,
+                }),
+              });
+              
+              if (sosResponse.ok) {
+                console.log("✅ SOS Alert endpoint called successfully");
+              } else {
+                console.warn("⚠️ SOS Alert endpoint returned:", sosResponse.status);
+              }
+            } catch (error) {
+              console.warn("⚠️ SOS Alert endpoint error (non-critical):", error);
+            }
+          })();
           
           console.log("Backend response:", {
             status: response.status,

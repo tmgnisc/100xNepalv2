@@ -17,6 +17,8 @@ const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
     // Use the same hostname but port 3001 for API
+    // Note: JSON Server routes.json rewrites /api/* to /*, so we use /api prefix
+    // But direct endpoints work without /api, so we provide both options
     return `${protocol}//${hostname}:3001/api`;
   }
   
@@ -37,6 +39,7 @@ export const API_ENDPOINTS = {
   hospitals: `${API_BASE_URL}/hospitals`,
   volunteers: `${API_BASE_URL}/volunteers`,
   ambulances: `${API_BASE_URL}/ambulances`,
+  sosAlert: `${API_BASE_URL}/sos-alert`, // Custom SOS alert endpoint
 } as const;
 
 /**

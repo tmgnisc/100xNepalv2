@@ -25,6 +25,7 @@ export interface Emergency {
   ambulanceId?: string;
   lat?: number;
   lng?: number;
+  createdAt?: string; // ISO timestamp for tracking when emergency was created
 }
 
 export interface Hospital {
