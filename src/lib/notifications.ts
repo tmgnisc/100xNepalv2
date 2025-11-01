@@ -89,14 +89,22 @@ class NotificationService {
    * Show browser notification for SOS alert
    */
   showNotification(emergency: Emergency): void {
-    // Check permission again (it might have been granted since last check)
-    if (Notification.permission !== "granted") {
-      console.warn("⚠️ Notification permission not granted:", Notification.permission);
-      this.notificationPermission = Notification.permission;
+    // Always check permission fresh (don't rely on cached state)
+    const currentPermission = Notification.permission;
+    
+    if (currentPermission !== "granted") {
+      console.warn("⚠️ Notification permission not granted:", currentPermission);
+      this.notificationPermission = currentPermission;
       
       // On mobile, try to guide user
       if (this.isMobileDevice()) {
         console.warn("📱 Mobile: Please allow notifications in browser settings");
+        console.warn("📱 Current status:", currentPermission);
+        
+        // If using HTTP, note the limitation
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+          console.warn("📱 Note: Some browsers restrict notifications on HTTP (non-HTTPS) sites");
+        }
       }
       return;
     }

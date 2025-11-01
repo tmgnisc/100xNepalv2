@@ -43,22 +43,61 @@ export default function NotificationBanner() {
 
   const handleRequestPermission = async () => {
     try {
+      // Force refresh permission status first
+      const currentStatus = Notification.permission;
+      console.log("📊 Current permission status:", currentStatus);
+      
+      if (currentStatus === "granted") {
+        // Already granted, just update state
+        setPermissionStatus("granted");
+        setShowBanner(false);
+        return;
+      }
+
+      // Request permission
       const granted = await notificationService.requestPermission();
-      if (granted) {
+      
+      // Force refresh permission check after request
+      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+      const newStatus = Notification.permission;
+      
+      if (granted || newStatus === "granted") {
         setPermissionStatus("granted");
         setShowBanner(false);
         
         // Show success message
-        if (window.confirm) {
-          alert("✅ Notifications enabled! You will now receive SOS alerts.");
-        }
+        alert("✅ Notifications enabled! You will now receive SOS alerts.");
+        
+        // Reload notification service to pick up new permission
+        window.location.reload();
       } else {
-        setPermissionStatus(notificationService.getPermissionStatus());
-        // Show instructions
-        alert("📱 Please enable notifications in your browser settings:\n\nChrome: ⋮ Menu → Settings → Site Settings → Notifications\n\nSafari: Settings → Safari → Notifications");
+        setPermissionStatus(newStatus);
+        
+        // Provide more detailed help
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isAndroid = /Android/.test(navigator.userAgent);
+        
+        let instructions = "📱 Permission was denied. Please try:\n\n";
+        
+        if (isAndroid) {
+          instructions += "1. Tap ⋮ (three dots) → Settings\n";
+          instructions += "2. Site Settings → Notifications\n";
+          instructions += "3. Find this site → Set to 'Allow'\n";
+          instructions += "4. Also check: Phone Settings → Apps → Browser → Notifications\n\n";
+        } else if (isIOS) {
+          instructions += "1. Tap 'Aa' icon → Website Settings\n";
+          instructions += "2. Set Notifications to 'Allow'\n";
+          instructions += "3. Also check: Settings → Safari → Notifications\n\n";
+        }
+        
+        instructions += "Note: HTTP (non-HTTPS) sites may have notification restrictions.\n";
+        instructions += "If it still doesn't work, try closing and reopening the browser tab.";
+        
+        alert(instructions);
       }
     } catch (error) {
       console.error("Error requesting permission:", error);
+      alert("Error requesting permission. Please check browser console for details.");
     }
   };
 
@@ -126,11 +165,43 @@ export default function NotificationBanner() {
                 </Button>
               </div>
               {permissionStatus === "denied" && (
-                <div className="mt-2 p-2 bg-warning/10 rounded text-xs text-warning flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>
-                    Permission denied. Go to browser Settings → Site Settings → Notifications → Allow
-                  </span>
+                <div className="mt-2 p-2 bg-warning/10 rounded text-xs text-warning flex flex-col gap-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold mb-1">Permission denied</p>
+                      <p className="text-xs">
+                        If you already enabled it in settings, try:
+                      </p>
+                      <ul className="text-xs mt-1 space-y-1 list-disc list-inside">
+                        <li>Refresh this page</li>
+                        <li>Close and reopen browser tab</li>
+                        <li>Clear site data and try again</li>
+                        <li>Check system notification settings</li>
+                      </ul>
+                      <p className="text-xs mt-1 italic">
+                        Note: HTTP (non-HTTPS) sites may have restrictions on some browsers.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      // Try to refresh permission status
+                      const status = Notification.permission;
+                      setPermissionStatus(status);
+                      if (status === "granted") {
+                        setShowBanner(false);
+                        window.location.reload();
+                      } else {
+                        alert(`Current status: ${status}\n\nIf you enabled it in settings, try refreshing the page.`);
+                      }
+                    }}
+                    className="text-xs w-full"
+                  >
+                    Refresh Status
+                  </Button>
                 </div>
               )}
             </div>
