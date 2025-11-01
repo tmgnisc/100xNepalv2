@@ -10,6 +10,7 @@ import {
   StatusBar,
 } from 'react-native';
 import BluetoothService from './services/BluetoothService';
+import ApiService from './services/ApiService';
 import { Emergency } from './types/emergency';
 
 const App = () => {
@@ -17,6 +18,7 @@ const App = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [alerts, setAlerts] = useState<Emergency[]>([]);
   const [discoveredDevices, setDiscoveredDevices] = useState<any[]>([]);
+  const [pairedDevices, setPairedDevices] = useState<any[]>([]);
   const alertCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const deviceUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -30,6 +32,18 @@ const App = () => {
       }
     };
   }, []);
+
+  const loadPairedDevices = async () => {
+    try {
+      const devices = await BluetoothService.getPairedDevices();
+      setPairedDevices(devices);
+      // Also update discovered devices list
+      const allDevices = BluetoothService.getDiscoveredDevices();
+      setDiscoveredDevices(allDevices);
+    } catch (error) {
+      console.error('Error loading paired devices:', error);
+    }
+  };
 
   const initializeApp = async () => {
     try {
@@ -48,10 +62,12 @@ const App = () => {
         if (initialized) {
           setIsReady(true);
           console.log('✅ App initialized successfully');
+          
+          // Try to load paired devices (non-blocking)
+          loadPairedDevices();
         } else {
           console.warn('⚠️ Bluetooth initialization failed, but app can still run');
           setIsReady(true); // Still mark as ready - user can enable Bluetooth later
-          // Don't show alert immediately - let user try when ready
         }
       } catch (initError: any) {
         console.error('Bluetooth initialization error:', initError);
@@ -66,14 +82,6 @@ const App = () => {
       console.error('Initialization error:', error?.message || error);
       // Don't crash - show warning but allow app to continue
       setIsReady(true);
-      // Only show alert if it's a critical error
-      if (error?.message?.includes('critical') || error?.message?.includes('fatal')) {
-        Alert.alert(
-          'Warning',
-          'Some features may not work. Please check Bluetooth permissions in Settings.',
-          [{ text: 'OK' }]
-        );
-      }
     }
   };
 
@@ -93,7 +101,19 @@ const App = () => {
       
       // Dismiss loading alert
       
-      // Check for alerts periodically
+      // Start polling backend API for new emergencies (when web app triggers SOS)
+      ApiService.startPolling((newEmergencies: Emergency[]) => {
+        // When new emergencies found from API, receive them
+        newEmergencies.forEach(async (emergency) => {
+          await BluetoothService.receiveSOSAlert(emergency);
+          console.log('📬 Received SOS alert from API:', emergency.id);
+        });
+        // Update alerts list
+        const updatedAlerts = BluetoothService.getReceivedAlerts();
+        setAlerts([...updatedAlerts]);
+      }, 5000); // Poll every 5 seconds
+      
+      // Check for Bluetooth-shared alerts periodically
       alertCheckIntervalRef.current = setInterval(async () => {
         try {
           await BluetoothService.checkForSharedAlerts();
@@ -166,6 +186,8 @@ const App = () => {
   const stopScanning = () => {
     try {
       BluetoothService.stopScanning();
+      ApiService.stopPolling(); // Stop API polling too
+      
       // Clear intervals if they exist
       if (alertCheckIntervalRef.current) {
         clearInterval(alertCheckIntervalRef.current);
@@ -278,7 +300,72 @@ const App = () => {
             <Text style={styles.buttonTextSmall}>📢 Test Broadcast</Text>
           </TouchableOpacity>
         </View>
+        
+        {/* Refresh paired devices button */}
+        <TouchableOpacity
+          style={[styles.button, styles.buttonRefresh]}
+          onPress={loadPairedDevices}
+        >
+          <Text style={styles.buttonTextSmall}>🔄 Refresh Device List</Text>
+        </TouchableOpacity>
       </View>
+
+      {(discoveredDevices.length > 0 || pairedDevices.length > 0) && (
+        <View style={styles.devicesContainer}>
+          <Text style={styles.sectionTitle}>
+            Available Devices ({discoveredDevices.length || pairedDevices.length})
+            {!isScanning && <Text style={styles.hintText}> (Tap "Start Listening" to scan for more)</Text>}
+          </Text>
+          <ScrollView style={styles.devicesList}>
+            {discoveredDevices.map((device) => (
+              <TouchableOpacity
+                key={device.id}
+                style={[styles.deviceCard, device.isPaired && styles.pairedDeviceCard]}
+                onPress={async () => {
+                  try {
+                    Alert.alert(
+                      'Connect to Device',
+                      `Connect to ${device.name}?`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Connect',
+                          onPress: async () => {
+                            const connected = await BluetoothService.connectToDevice(device.id);
+                            if (connected) {
+                              Alert.alert('Success', `Connected to ${device.name}`);
+                            } else {
+                              Alert.alert('Error', `Failed to connect to ${device.name}`);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  } catch (error) {
+                    console.error('Error connecting:', error);
+                  }
+                }}
+              >
+                <View style={styles.deviceCardContent}>
+                  <View style={styles.deviceCardHeader}>
+                    <Text style={styles.deviceName}>
+                      {device.name}
+                      {device.isPaired && ' (Paired)'}
+                    </Text>
+                    {device.advertising?.serviceUUIDs?.includes('12345678-1234-1234-1234-123456789ABC') && (
+                      <Text style={styles.sosIndicator}>🚨 SOS</Text>
+                    )}
+                  </View>
+                  <Text style={styles.deviceRssi}>
+                    {device.rssi ? `Signal: ${device.rssi} dBm` : 'Paired Device'}
+                  </Text>
+                  <Text style={styles.deviceId}>ID: {device.id.substring(0, 12)}...</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={styles.alertsContainer}>
         <Text style={styles.sectionTitle}>
@@ -359,6 +446,16 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
   },
+  buttonRefresh: {
+    backgroundColor: '#6366f1',
+    padding: 12,
+    marginTop: 8,
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: 'normal',
+  },
   testButtons: {
     flexDirection: 'row',
     marginTop: 8,
@@ -376,6 +473,58 @@ const styles = StyleSheet.create({
   alertsContainer: {
     flex: 1,
     padding: 16,
+  },
+  devicesContainer: {
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  devicesList: {
+    maxHeight: 200,
+  },
+  deviceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginHorizontal: 16,
+  },
+  pairedDeviceCard: {
+    borderColor: '#10b981',
+    borderWidth: 2,
+    backgroundColor: '#f0fdf4',
+  },
+  deviceCardContent: {
+    flex: 1,
+  },
+  deviceCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  deviceName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  deviceRssi: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  deviceId: {
+    fontSize: 10,
+    color: '#9ca3af',
+    marginTop: 4,
+  },
+  sosIndicator: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 18,

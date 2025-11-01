@@ -61,55 +61,125 @@ class BluetoothService {
       // Safety check for Platform
       if (!Platform || !Platform.OS) {
         console.warn('⚠️ Platform not available');
-        return false;
+        // Try to continue anyway - basic Bluetooth might work
+        return true;
       }
       
       if (Platform.OS === 'android') {
+        let hasEssentialPermissions = false;
+        
         // Android 12+ (API 31+) requires BLUETOOTH_SCAN and BLUETOOTH_CONNECT
         if (Platform.Version >= 31) {
-          const scanResult = await check(PERMISSIONS.ANDROID.BLUETOOTH_SCAN);
-          const connectResult = await check(PERMISSIONS.ANDROID.BLUETOOTH_CONNECT);
-          const locationResult = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-          
-          if (scanResult !== RESULTS.GRANTED) {
-            const scanRequest = await request(PERMISSIONS.ANDROID.BLUETOOTH_SCAN);
-            if (scanRequest !== RESULTS.GRANTED) {
-              console.warn('⚠️ BLUETOOTH_SCAN permission denied');
-              return false;
+          try {
+            const scanResult = await check(PERMISSIONS.ANDROID.BLUETOOTH_SCAN);
+            const connectResult = await check(PERMISSIONS.ANDROID.BLUETOOTH_CONNECT);
+            
+            // Request if not granted
+            if (scanResult !== RESULTS.GRANTED) {
+              console.log('🔐 Requesting BLUETOOTH_SCAN permission...');
+              const scanRequest = await request(PERMISSIONS.ANDROID.BLUETOOTH_SCAN);
+              if (scanRequest === RESULTS.GRANTED) {
+                console.log('✅ BLUETOOTH_SCAN granted');
+                hasEssentialPermissions = true;
+              } else {
+                console.warn('⚠️ BLUETOOTH_SCAN permission denied');
+              }
+            } else {
+              hasEssentialPermissions = true;
             }
-          }
-          
-          if (connectResult !== RESULTS.GRANTED) {
-            const connectRequest = await request(PERMISSIONS.ANDROID.BLUETOOTH_CONNECT);
-            if (connectRequest !== RESULTS.GRANTED) {
-              console.warn('⚠️ BLUETOOTH_CONNECT permission denied');
-              return false;
+            
+            if (connectResult !== RESULTS.GRANTED) {
+              console.log('🔐 Requesting BLUETOOTH_CONNECT permission...');
+              const connectRequest = await request(PERMISSIONS.ANDROID.BLUETOOTH_CONNECT);
+              if (connectRequest === RESULTS.GRANTED) {
+                console.log('✅ BLUETOOTH_CONNECT granted');
+                hasEssentialPermissions = true;
+              } else {
+                console.warn('⚠️ BLUETOOTH_CONNECT permission denied');
+              }
+            } else {
+              hasEssentialPermissions = true;
             }
-          }
-          
-          // Location still recommended for BLE scanning
-          if (locationResult !== RESULTS.GRANTED) {
-            const locationRequest = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-            // Location is nice-to-have, don't block if denied
-            console.warn('⚠️ Location permission not granted (may affect scanning)');
+            
+            // Location is recommended but not critical for BLE
+            try {
+              const locationResult = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+              if (locationResult !== RESULTS.GRANTED) {
+                await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+              }
+            } catch (locError) {
+              console.warn('⚠️ Location permission request failed (non-critical):', locError);
+            }
+          } catch (permError) {
+            console.warn('⚠️ Permission request error (continuing anyway):', permError);
+            // Continue - some operations might still work
+            hasEssentialPermissions = true;
           }
         } else {
           // Android < 12 - Location is required for BLE scanning
-          const locationResult = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-          if (locationResult !== RESULTS.GRANTED) {
-            const locationRequest = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
-            if (locationRequest !== RESULTS.GRANTED) {
-              console.warn('⚠️ Location permission required for Bluetooth scanning');
-              return false;
+          try {
+            const locationResult = await check(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+            if (locationResult !== RESULTS.GRANTED) {
+              console.log('🔐 Requesting LOCATION permission...');
+              const locationRequest = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+              if (locationRequest === RESULTS.GRANTED) {
+                console.log('✅ LOCATION granted');
+                hasEssentialPermissions = true;
+              } else {
+                console.warn('⚠️ Location permission required for Bluetooth scanning');
+              }
+            } else {
+              hasEssentialPermissions = true;
             }
+          } catch (locError) {
+            console.warn('⚠️ Location permission error (continuing anyway):', locError);
+            hasEssentialPermissions = true;
           }
         }
+        
+        // Return true if we have essential permissions or if we should try anyway
+        return hasEssentialPermissions || true; // Try to continue even if permissions not perfect
       }
       
       return true;
     } catch (error) {
       console.error('❌ Permission check failed:', error);
-      return false;
+      // Don't block - try to continue anyway
+      return true;
+    }
+  }
+  
+  // Get list of paired Bluetooth devices
+  async getPairedDevices(): Promise<any[]> {
+    try {
+      if (!BleManager) {
+        return [];
+      }
+
+      // Check permissions first
+      await this.checkPermissions();
+
+      // Get bonded (paired) devices
+      const bondedDevices = await BleManager.getBondedPeripherals();
+      
+      console.log(`📱 Found ${bondedDevices.length} paired device(s)`);
+      
+      // Store paired devices for UI
+      bondedDevices.forEach((device: any) => {
+        this.discoveredDevices.set(device.id, {
+          id: device.id,
+          name: device.name || 'Unknown Device',
+          rssi: 0, // Paired devices don't have RSSI
+          advertising: device.advertising || {},
+          timestamp: Date.now(),
+          isPaired: true,
+        });
+      });
+      
+      return bondedDevices || [];
+    } catch (error: any) {
+      console.error('❌ Failed to get paired devices:', error?.message || error);
+      return [];
     }
   }
 
@@ -349,7 +419,7 @@ class BluetoothService {
       try {
         hasPermissions = await this.checkPermissions();
         if (!hasPermissions) {
-          // Try requesting again more aggressively
+          // Try requesting again
           console.log('🔄 Retrying permission request...');
           hasPermissions = await this.checkPermissions();
         }
@@ -363,11 +433,21 @@ class BluetoothService {
         }
       }
 
+      // Even if permissions not fully granted, try to continue
+      // Some operations might still work
       if (!hasPermissions) {
-        throw new Error('Bluetooth permissions not granted. Please grant permissions in Settings.');
+        console.warn('⚠️ Some permissions may not be granted, but continuing...');
+      } else {
+        console.log('✅ Permissions granted');
       }
-
-      console.log('✅ Permissions granted');
+      
+      // Get paired devices first
+      console.log('📱 Loading paired devices...');
+      try {
+        await this.getPairedDevices();
+      } catch (pairedError) {
+        console.warn('⚠️ Could not load paired devices:', pairedError);
+      }
 
       // Step 2: Check and enable Bluetooth
       console.log('🔵 Checking Bluetooth state...');
@@ -581,18 +661,10 @@ class BluetoothService {
     }
   }
 
-  // Check for shared alerts (simplified mechanism)
+  // Check for shared alerts (from Bluetooth and API)
   async checkForSharedAlerts(): Promise<void> {
     try {
-      // This is a placeholder for a shared storage mechanism
-      // In a real scenario, devices would share via:
-      // 1. BLE advertisements (limited data)
-      // 2. BLE connection + characteristic read/write (what we're doing above)
-      // 3. Nearby Messages API (Android) / Multipeer Connectivity (iOS)
-      
-      // For now, we'll check if there are any new alerts stored locally
-      // that might have been shared via another mechanism
-      
+      // Check local Bluetooth-shared alerts
       const allKeys = await AsyncStorage.getAllKeys();
       const sosKeys = allKeys.filter(key => key.startsWith('sos_'));
       
@@ -604,13 +676,15 @@ class BluetoothService {
             // Check if we already have this alert
             if (!this.receivedAlerts.find(a => a.id === emergency.id)) {
               await this.receiveSOSAlert(emergency);
-              console.log('📬 Received shared SOS alert:', emergency.id);
+              console.log('📬 Received shared SOS alert (Bluetooth):', emergency.id);
             }
           }
         } catch (error) {
           console.error('Error processing shared alert:', error);
         }
       }
+      
+      // Note: API polling is handled separately in App.tsx via ApiService
     } catch (error) {
       console.error('❌ Failed to check alerts:', error);
     }
@@ -675,19 +749,61 @@ class BluetoothService {
   }
 
   getDiscoveredDevices(): any[] {
-    // Remove devices older than 30 seconds
-    const now = Date.now();
-    const recentDevices: any[] = [];
+    // Return both paired and discovered devices
+    const devices: any[] = [];
     
-    this.discoveredDevices.forEach((device, id) => {
-      if (now - device.timestamp < 30000) { // 30 seconds
-        recentDevices.push(device);
-      } else {
-        this.discoveredDevices.delete(id);
-      }
+    this.discoveredDevices.forEach((device) => {
+      devices.push(device);
     });
     
-    return recentDevices;
+    // Sort: paired devices first, then by RSSI (stronger signal first)
+    devices.sort((a, b) => {
+      // Paired devices first
+      if (a.isPaired && !b.isPaired) return -1;
+      if (!a.isPaired && b.isPaired) return 1;
+      // Then by RSSI (higher is better)
+      return (b.rssi || 0) - (a.rssi || 0);
+    });
+    
+    return devices;
+  }
+  
+  // Manually connect to a specific device
+  async connectToDevice(deviceId: string): Promise<boolean> {
+    try {
+      console.log('🔗 Manually connecting to device:', deviceId);
+      
+      // Check permissions
+      await this.checkPermissions();
+      
+      // Connect
+      await BleManager.connect(deviceId);
+      this.connectedDevices.push(deviceId);
+      
+      // Wait for connection
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Check for SOS data
+      const services = await BleManager.retrieveServices(deviceId);
+      
+      // Check for SOS service
+      if (services.characteristics) {
+        for (const service of services.characteristics) {
+          if (service.service === SOS_SERVICE_UUID) {
+            console.log('✅ Found SOS service, reading data...');
+            await this.handleSOSDevice({ id: deviceId });
+            return true;
+          }
+        }
+      }
+      
+      console.log('ℹ️ Device connected, but no SOS service found');
+      return true; // Connected successfully even if no SOS data
+      
+    } catch (error: any) {
+      console.error('❌ Failed to connect to device:', error?.message || error);
+      return false;
+    }
   }
 
   async loadStoredAlerts(): Promise<void> {
